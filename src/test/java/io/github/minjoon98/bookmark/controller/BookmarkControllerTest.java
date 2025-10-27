@@ -145,7 +145,8 @@ class BookmarkControllerTest {
 
         // when & then
         mockMvc.perform(delete("/bookmarks/{id}", id))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("북마크가 성공적으로 삭제되었습니다"));
 
         verify(bookmarkService, times(1)).deleteBookmark(id);
     }
