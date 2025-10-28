@@ -18,6 +18,7 @@
 - **Build Tool**: Gradle
 - **Test**: JUnit 5, Mockito, MockMvc
 - **API Documentation**: Swagger/OpenAPI (SpringDoc)
+- **CI**: GitHub Actions
 - **Libraries**:
   - Spring Data JPA
   - Lombok
@@ -337,21 +338,7 @@ build/reports/tests/test/index.html
 
 ## 개선할 점
 
-### 1. 페이지네이션 미구현
-**현재 상황**: 전체 북마크를 한 번에 조회
-**개선 방향**:
-- Spring Data JPA의 `Pageable`을 활용한 페이지네이션 구현
-- 대량의 데이터 조회 시 성능 개선
-
-```java
-// 개선 예시
-public Page<BookmarkResponse> getAllBookmarks(Pageable pageable) {
-    return bookmarkRepository.findAll(pageable)
-        .map(BookmarkResponse::from);
-}
-```
-
-### 2. 태그 기능 미구현
+### 1. 태그 기능 미구현
 **현재 상황**: 제목과 URL로만 검색 가능
 **개선 방향**:
 - 북마크에 여러 태그를 추가할 수 있는 Many-to-Many 관계 구현
@@ -367,6 +354,20 @@ public class Tag {
 
     @ManyToMany(mappedBy = "tags")
     private Set<Bookmark> bookmarks;
+}
+```
+
+### 2. 캐싱 미구현
+**현재 상황**: 매 요청마다 데이터베이스 조회
+**개선 방향**:
+- Spring Cache를 활용한 자주 조회되는 데이터 캐싱
+- Redis 등 분산 캐시 도입 검토
+
+```java
+// 개선 예시
+@Cacheable(value = "bookmarks", key = "#id")
+public BookmarkResponse getBookmarkById(Long id) {
+    // ...
 }
 ```
 
