@@ -111,7 +111,7 @@ java -jar build/libs/bookmark-0.0.1-SNAPSHOT.jar
 | 기능 | 메서드 | 엔드포인트 | 설명 |
 |------|--------|-----------|------|
 | 북마크 등록 | POST | `/bookmarks` | 새로운 북마크 추가 |
-| 북마크 목록 조회 | GET | `/bookmarks` | 전체 북마크 조회 (검색 지원) |
+| 북마크 목록 조회 | GET | `/bookmarks` | 전체 북마크 조회 (검색, 페이지네이션, 정렬 지원) |
 | 북마크 상세 조회 | GET | `/bookmarks/{id}` | 특정 북마크 상세 정보 조회 |
 | 북마크 수정 | PUT | `/bookmarks/{id}` | 북마크 정보 수정 |
 | 북마크 삭제 | DELETE | `/bookmarks/{id}` | 북마크 삭제 |
@@ -141,44 +141,68 @@ java -jar build/libs/bookmark-0.0.1-SNAPSHOT.jar
 ```
 
 #### 2. 북마크 목록 조회 (GET /bookmarks)
+
+**기본 조회**
+```http
+GET /bookmarks
+```
+
 **응답 (200 OK)**
 ```json
-[
-  {
-    "id": 1,
-    "title": "Google",
-    "url": "https://www.google.com",
-    "memo": "검색 엔진",
-    "createdAt": "2025-01-15T10:30:00",
-    "updatedAt": "2025-01-15T10:30:00"
+{
+  "content": [
+    {
+      "id": 1,
+      "title": "Google",
+      "url": "https://www.google.com",
+      "memo": "검색 엔진",
+      "createdAt": "2025-01-15T10:30:00",
+      "updatedAt": "2025-01-15T10:30:00"
+    }
+  ],
+  "pageable": {
+    "pageNumber": 0,
+    "pageSize": 20
   },
-  {
-    "id": 2,
-    "title": "GitHub",
-    "url": "https://github.com",
-    "memo": "코드 저장소",
-    "createdAt": "2025-01-15T10:35:00",
-    "updatedAt": "2025-01-15T10:35:00"
-  }
-]
+  "totalElements": 1,
+  "totalPages": 1,
+  "size": 20,
+  "number": 0,
+  "first": true,
+  "last": true
+}
 ```
 
-#### 3. 검색 기능 (GET /bookmarks?search=Git)
-**응답 (200 OK)**
-```json
-[
-  {
-    "id": 2,
-    "title": "GitHub",
-    "url": "https://github.com",
-    "memo": "코드 저장소",
-    "createdAt": "2025-01-15T10:35:00",
-    "updatedAt": "2025-01-15T10:35:00"
-  }
-]
+**검색 기능**
+```http
+GET /bookmarks?q=github
+```
+- `q`: 검색 키워드 (제목 또는 URL에서 부분 일치 검색, 대소문자 무시)
+
+**페이지네이션**
+```http
+GET /bookmarks?page=0&size=10
+```
+- `page`: 페이지 번호 (0부터 시작, 기본값: 0)
+- `size`: 페이지 크기 (기본값: 20)
+
+**정렬**
+```http
+GET /bookmarks?sort=title,asc
+GET /bookmarks?sort=createdAt,desc&sort=title,asc
+```
+- `sort`: 정렬 기준 필드와 방향 (형식: `필드명,방향`)
+- 허용 필드: `createdAt`, `updatedAt`, `title`, `url`
+- 방향: `asc` (오름차순) 또는 `desc` (내림차순)
+- 기본값: `createdAt,desc` (최신순)
+- 다중 정렬 가능
+
+**복합 사용**
+```http
+GET /bookmarks?q=git&page=0&size=10&sort=createdAt,desc
 ```
 
-#### 4. 북마크 수정 (PUT /bookmarks/1)
+#### 3. 북마크 수정 (PUT /bookmarks/1)
 **요청**
 ```json
 {
@@ -199,7 +223,7 @@ java -jar build/libs/bookmark-0.0.1-SNAPSHOT.jar
 }
 ```
 
-#### 5. 북마크 삭제 (DELETE /bookmarks/1)
+#### 4. 북마크 삭제 (DELETE /bookmarks/1)
 **응답 (200 OK)**
 ```json
 {
