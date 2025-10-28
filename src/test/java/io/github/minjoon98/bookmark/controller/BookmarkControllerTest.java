@@ -10,6 +10,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -63,21 +67,25 @@ class BookmarkControllerTest {
     }
 
     @Test
-    @DisplayName("북마크 목록 조회 API 테스트")
-    void getAllBookmarks() throws Exception {
+    @DisplayName("북마크 목록 조회 API 테스트 (기본값)")
+    void getBookmarks() throws Exception {
         // given
-        List<BookmarkResponse> responses = Arrays.asList(
+        List<BookmarkResponse> content = Arrays.asList(
                 BookmarkResponse.builder().id(1L).title("Google").url("https://google.com").createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build(),
                 BookmarkResponse.builder().id(2L).title("GitHub").url("https://github.com").createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build()
         );
-        given(bookmarkService.getAllBookmarks()).willReturn(responses);
+        Page<BookmarkResponse> page = new PageImpl<>(content, PageRequest.of(0, 20), 2);
+        given(bookmarkService.getBookmarks(eq(null), any(Pageable.class))).willReturn(page);
 
         // when & then
         mockMvc.perform(get("/bookmarks"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].title").value("Google"))
-                .andExpect(jsonPath("$[1].title").value("GitHub"));
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].title").value("Google"))
+                .andExpect(jsonPath("$.content[1].title").value("GitHub"))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.number").value(0));
     }
 
     @Test
@@ -156,17 +164,19 @@ class BookmarkControllerTest {
     void searchBookmarks() throws Exception {
         // given
         String keyword = "Git";
-        List<BookmarkResponse> responses = Arrays.asList(
+        List<BookmarkResponse> content = Arrays.asList(
                 BookmarkResponse.builder().id(1L).title("GitHub").url("https://github.com").createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build()
         );
-        given(bookmarkService.searchBookmarks(keyword)).willReturn(responses);
+        Page<BookmarkResponse> page = new PageImpl<>(content, PageRequest.of(0, 20), 1);
+        given(bookmarkService.getBookmarks(eq(keyword), any(Pageable.class))).willReturn(page);
 
         // when & then
         mockMvc.perform(get("/bookmarks")
-                        .param("search", keyword))
+                        .param("q", keyword))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].title").value("GitHub"));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("GitHub"))
+                .andExpect(jsonPath("$.totalElements").value(1));
     }
 
     @Test
@@ -180,5 +190,51 @@ class BookmarkControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("페이지네이션과 정렬 적용된 북마크 목록 조회 API 테스트")
+    void getBookmarksWithPaginationAndSort() throws Exception {
+        // given
+        List<BookmarkResponse> content = Arrays.asList(
+                BookmarkResponse.builder().id(1L).title("Google").url("https://google.com").createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build(),
+                BookmarkResponse.builder().id(2L).title("GitHub").url("https://github.com").createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build()
+        );
+        Page<BookmarkResponse> page = new PageImpl<>(content, PageRequest.of(0, 10), 2);
+        given(bookmarkService.getBookmarks(eq(null), any(Pageable.class))).willReturn(page);
+
+        // when & then
+        mockMvc.perform(get("/bookmarks")
+                        .param("page", "0")
+                        .param("size", "10")
+                        .param("sort", "title,asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].title").value("Google"))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.number").value(0));
+    }
+
+    @Test
+    @DisplayName("페이지네이션 적용된 검색 API 테스트")
+    void searchBookmarksWithPagination() throws Exception {
+        // given
+        String keyword = "Git";
+        List<BookmarkResponse> content = Arrays.asList(
+                BookmarkResponse.builder().id(1L).title("GitHub").url("https://github.com").createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build()
+        );
+        Page<BookmarkResponse> page = new PageImpl<>(content, PageRequest.of(0, 10), 1);
+        given(bookmarkService.getBookmarks(eq(keyword), any(Pageable.class))).willReturn(page);
+
+        // when & then
+        mockMvc.perform(get("/bookmarks")
+                        .param("q", keyword)
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("GitHub"))
+                .andExpect(jsonPath("$.totalElements").value(1));
     }
 }

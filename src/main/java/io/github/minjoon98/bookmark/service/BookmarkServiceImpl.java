@@ -7,11 +7,11 @@ import io.github.minjoon98.bookmark.dto.request.BookmarkUpdateRequest;
 import io.github.minjoon98.bookmark.exception.BookmarkNotFoundException;
 import io.github.minjoon98.bookmark.repository.BookmarkRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.stream.Collectors;
+import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -34,10 +34,12 @@ public class BookmarkServiceImpl implements BookmarkService {
     }
 
     @Override
-    public List<BookmarkResponse> getAllBookmarks() {
-        return bookmarkRepository.findAll().stream()
-                .map(BookmarkResponse::from)
-                .collect(Collectors.toList());
+    public Page<BookmarkResponse> getBookmarks(String q, Pageable pageable) {
+        Page<Bookmark> page = StringUtils.hasText(q)
+                ? bookmarkRepository.findByTitleContainingIgnoreCaseOrUrlContainingIgnoreCase(q, q, pageable)
+                : bookmarkRepository.findAll(pageable);
+
+        return page.map(BookmarkResponse::from);
     }
 
     @Override
@@ -64,12 +66,5 @@ public class BookmarkServiceImpl implements BookmarkService {
             throw new BookmarkNotFoundException(id);
         }
         bookmarkRepository.deleteById(id);
-    }
-
-    @Override
-    public List<BookmarkResponse> searchBookmarks(String keyword) {
-        return bookmarkRepository.findByTitleContainingOrUrlContaining(keyword, keyword).stream()
-                .map(BookmarkResponse::from)
-                .collect(Collectors.toList());
     }
 }

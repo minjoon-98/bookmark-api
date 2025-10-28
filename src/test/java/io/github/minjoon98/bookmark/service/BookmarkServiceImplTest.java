@@ -12,14 +12,18 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
@@ -56,18 +60,19 @@ class BookmarkServiceImplTest {
 
     @Test
     @DisplayName("모든 북마크를 조회할 수 있다")
-    void getAllBookmarks() {
+    void getBookmarks() {
         // given
         Bookmark bookmark1 = Bookmark.builder().title("Google").url("https://google.com").build();
         Bookmark bookmark2 = Bookmark.builder().title("GitHub").url("https://github.com").build();
-        given(bookmarkRepository.findAll()).willReturn(Arrays.asList(bookmark1, bookmark2));
+        Page<Bookmark> page = new PageImpl<>(Arrays.asList(bookmark1, bookmark2), PageRequest.of(0, 20), 2);
+        given(bookmarkRepository.findAll(any(Pageable.class))).willReturn(page);
 
         // when
-        List<BookmarkResponse> responses = bookmarkServiceImpl.getAllBookmarks();
+        Page<BookmarkResponse> responses = bookmarkServiceImpl.getBookmarks(null, PageRequest.of(0, 20));
 
         // then
-        assertThat(responses).hasSize(2);
-        verify(bookmarkRepository, times(1)).findAll();
+        assertThat(responses.getContent()).hasSize(2);
+        verify(bookmarkRepository, times(1)).findAll(any(Pageable.class));
     }
 
     @Test
@@ -153,19 +158,21 @@ class BookmarkServiceImplTest {
     }
 
     @Test
-    @DisplayName("키워드로 북마크를 검색할 수 있다")
+    @DisplayName("키워드로 북마크를 검색할 수 있다 (대소문자 무시)")
     void searchBookmarks() {
         // given
-        String keyword = "Git";
+        String keyword = "git";
         Bookmark bookmark = Bookmark.builder().title("GitHub").url("https://github.com").build();
-        given(bookmarkRepository.findByTitleContainingOrUrlContaining(keyword, keyword))
-                .willReturn(Arrays.asList(bookmark));
+        Page<Bookmark> page = new PageImpl<>(Arrays.asList(bookmark), PageRequest.of(0, 20), 1);
+        given(bookmarkRepository.findByTitleContainingIgnoreCaseOrUrlContainingIgnoreCase(
+                eq(keyword), eq(keyword), any(Pageable.class)))
+                .willReturn(page);
 
         // when
-        List<BookmarkResponse> responses = bookmarkServiceImpl.searchBookmarks(keyword);
+        Page<BookmarkResponse> responses = bookmarkServiceImpl.getBookmarks(keyword, PageRequest.of(0, 20));
 
         // then
-        assertThat(responses).hasSize(1);
-        assertThat(responses.get(0).getTitle()).isEqualTo("GitHub");
+        assertThat(responses.getContent()).hasSize(1);
+        assertThat(responses.getContent().get(0).getTitle()).isEqualTo("GitHub");
     }
 }

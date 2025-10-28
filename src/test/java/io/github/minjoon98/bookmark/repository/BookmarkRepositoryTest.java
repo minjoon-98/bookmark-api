@@ -5,8 +5,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,7 +58,7 @@ class BookmarkRepositoryTest {
     }
 
     @Test
-    @DisplayName("제목이나 URL로 북마크를 검색할 수 있다")
+    @DisplayName("제목이나 URL로 북마크를 검색할 수 있다 (대소문자 무시)")
     void searchByTitleOrUrl() {
         // given
         bookmarkRepository.save(Bookmark.builder()
@@ -74,11 +75,12 @@ class BookmarkRepositoryTest {
                 .build());
 
         // when
-        List<Bookmark> results = bookmarkRepository.findByTitleContainingOrUrlContaining("Git", "Git");
+        Page<Bookmark> results = bookmarkRepository.findByTitleContainingIgnoreCaseOrUrlContainingIgnoreCase(
+                "git", "git", PageRequest.of(0, 10));
 
         // then
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).getTitle()).isEqualTo("GitHub");
+        assertThat(results.getContent()).hasSize(1);
+        assertThat(results.getContent().get(0).getTitle()).isEqualTo("GitHub");
     }
 
     @Test

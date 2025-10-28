@@ -14,12 +14,17 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.Set;
 
 @Tag(name = "Bookmark", description = "북마크 관리 API")
 @RestController
@@ -47,21 +52,69 @@ public class BookmarkController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @Operation(summary = "북마크 목록 조회", description = "전체 북마크 목록을 조회하거나 키워드로 검색합니다.")
+    @Operation(
+            summary = "북마크 목록 조회",
+            description = "전체 북마크 목록을 조회하거나 키워드로 검색할 수 있습니다."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공")
     })
     @GetMapping
-    public ResponseEntity<List<BookmarkResponse>> getAllBookmarks(
-            @Parameter(description = "검색 키워드 (제목 또는 URL)", required = false)
-            @RequestParam(required = false) String search) {
-        List<BookmarkResponse> responses;
-        if (search != null && !search.isEmpty()) {
-            responses = bookmarkService.searchBookmarks(search);
-        } else {
-            responses = bookmarkService.getAllBookmarks();
+    public Page<BookmarkResponse> getBookmarks(
+            @Parameter(description = "검색 키워드 (선택). 제목 또는 URL에서 부분 일치 검색 (대소문자 무시)")
+            @RequestParam(required = false, name = "q") String q,
+
+            @Parameter(description = "페이지 번호 (0부터 시작)")
+            @Min(0) @RequestParam(required = false, defaultValue = "0") Integer page,
+
+            @Parameter(description = "페이지 크기 (한 페이지에 포함될 항목 수)")
+            @Min(1) @RequestParam(required = false, defaultValue = "20") Integer size,
+
+            @Parameter(description = "정렬 기준. 형식: `필드명,방향`. 여러 개 지정 가능. 허용 필드: createdAt, updatedAt, title, url")
+            @RequestParam(required = false, defaultValue = "createdAt,desc") String[] sort) {
+
+        // Pageable 생성
+        Pageable pageable = PageRequest.of(page, size, Sort.by(parseSort(sort)));
+
+        // 정렬 필드 화이트리스트 검증
+        pageable = sanitizeSort(pageable, Set.of("createdAt", "updatedAt", "title", "url"));
+
+        return bookmarkService.getBookmarks(q, pageable);
+    }
+
+    /**
+     * sort 파라미터 배열을 Sort.Order 리스트로 변환
+     */
+    private Sort.Order[] parseSort(String[] sort) {
+        return java.util.Arrays.stream(sort)
+                .map(s -> {
+                    String[] parts = s.split(",");
+                    String property = parts[0];
+                    Sort.Direction direction = parts.length > 1 && "asc".equalsIgnoreCase(parts[1])
+                            ? Sort.Direction.ASC
+                            : Sort.Direction.DESC;
+                    return new Sort.Order(direction, property);
+                })
+                .toArray(Sort.Order[]::new);
+    }
+
+    /**
+     * 정렬 필드를 화이트리스트로 검증하여 안전한 Pageable 반환
+     */
+    private Pageable sanitizeSort(Pageable pageable, Set<String> allowedFields) {
+        if (pageable.getSort().isUnsorted()) {
+            return pageable;
         }
-        return ResponseEntity.ok(responses);
+
+        Sort safeSort = Sort.by(
+                pageable.getSort().stream()
+                        .map(order -> allowedFields.contains(order.getProperty())
+                                ? order
+                                : new Sort.Order(order.getDirection(), "createdAt"))
+                        .toList()
+        );
+
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), safeSort);
     }
 
     @Operation(summary = "북마크 상세 조회", description = "특정 ID의 북마크 상세 정보를 조회합니다.")
