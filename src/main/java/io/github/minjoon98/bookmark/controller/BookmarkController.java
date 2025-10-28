@@ -29,7 +29,7 @@ public class BookmarkController {
 
     private final BookmarkService bookmarkService;
 
-    @Operation(summary = "북마크 생성", description = "새로운 북마크를 생성합니다.")
+    @Operation(summary = "북마크 등록", description = "새로운 북마크를 생성합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "북마크 생성 성공",
                     content = @Content(schema = @Schema(implementation = BookmarkResponse.class))),
