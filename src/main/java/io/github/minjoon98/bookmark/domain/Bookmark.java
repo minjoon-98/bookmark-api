@@ -1,6 +1,8 @@
 package io.github.minjoon98.bookmark.domain;
 
 import jakarta.persistence.*;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -37,6 +39,15 @@ public class Bookmark {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    @ManyToMany
+    @JoinTable(
+        name = "bookmark_tags",
+        joinColumns = @JoinColumn(name = "bookmark_id"),
+        inverseJoinColumns = @JoinColumn(name = "tag_id"),
+        uniqueConstraints = @UniqueConstraint(columnNames = {"bookmark_id", "tag_id"})
+    )
+    private Set<Tag> tags = new LinkedHashSet<>();
+
     @Builder
     public Bookmark(String title, String url, String memo) {
         this.title = title;
@@ -54,5 +65,15 @@ public class Bookmark {
         if (memo != null) {
             this.memo = memo;
         }
+    }
+
+    public void addTag(Tag tag) {
+        this.tags.add(tag);
+        tag.getBookmarks().add(this);
+    }
+
+    public void removeTag(Tag tag) {
+        this.tags.remove(tag);
+        tag.getBookmarks().remove(this);
     }
 }

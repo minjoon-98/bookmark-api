@@ -10,4 +10,7 @@ import org.springframework.stereotype.Repository;
 public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {
 
     Page<Bookmark> findByTitleContainingIgnoreCaseOrUrlContainingIgnoreCase(String title, String url, Pageable pageable);
+
+    // 태그별 조회 (중복 제거)
+    Page<Bookmark> findDistinctByTags_NameIgnoreCase(String name, Pageable pageable);
 }
