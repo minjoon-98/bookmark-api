@@ -1,6 +1,6 @@
 package io.github.minjoon98.bookmark.service;
 
-import io.github.minjoon98.bookmark.domain.Bookmark;
+import io.github.minjoon98.bookmark.entity.Bookmark;
 import io.github.minjoon98.bookmark.dto.request.BookmarkCreateRequest;
 import io.github.minjoon98.bookmark.dto.response.BookmarkResponse;
 import io.github.minjoon98.bookmark.dto.request.BookmarkUpdateRequest;

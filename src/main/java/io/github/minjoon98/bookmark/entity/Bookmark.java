@@ -1,4 +1,4 @@
-package io.github.minjoon98.bookmark.domain;
+package io.github.minjoon98.bookmark.entity;
 
 import jakarta.persistence.*;
 import java.util.LinkedHashSet;

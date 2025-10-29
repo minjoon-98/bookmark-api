@@ -1,7 +1,7 @@
 package io.github.minjoon98.bookmark.dto.response;
 
-import io.github.minjoon98.bookmark.domain.Bookmark;
-import io.github.minjoon98.bookmark.domain.Tag;
+import io.github.minjoon98.bookmark.entity.Bookmark;
+import io.github.minjoon98.bookmark.entity.Tag;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import lombok.AllArgsConstructor;
