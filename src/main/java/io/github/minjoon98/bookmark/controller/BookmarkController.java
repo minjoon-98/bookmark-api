@@ -2,6 +2,7 @@ package io.github.minjoon98.bookmark.controller;
 
 import io.github.minjoon98.bookmark.dto.request.BookmarkCreateRequest;
 import io.github.minjoon98.bookmark.dto.request.BookmarkUpdateRequest;
+import io.github.minjoon98.bookmark.dto.request.TagUpsertRequest;
 import io.github.minjoon98.bookmark.dto.response.BookmarkResponse;
 import io.github.minjoon98.bookmark.dto.response.ErrorResponse;
 import io.github.minjoon98.bookmark.dto.response.MessageResponse;
@@ -62,7 +63,7 @@ public class BookmarkController {
     @GetMapping
     public Page<BookmarkResponse> getBookmarks(
             @Parameter(description = "검색 키워드 (선택). 제목 또는 URL에서 부분 일치 검색 (대소문자 무시)")
-            @RequestParam(required = false, name = "q") String q,
+            @RequestParam(required = false, name = "search") String search,
 
             @Parameter(description = "페이지 번호 (0부터 시작)")
             @Min(0) @RequestParam(required = false, defaultValue = "0") Integer page,
@@ -79,7 +80,42 @@ public class BookmarkController {
         // 정렬 필드 화이트리스트 검증
         pageable = sanitizeSort(pageable, Set.of("createdAt", "updatedAt", "title", "url"));
 
-        return bookmarkService.getBookmarks(q, pageable);
+        return bookmarkService.getBookmarks(search, pageable);
+    }
+
+    @Operation(summary = "태그로 북마크 조회", description = "특정 태그를 가진 북마크를 페이지네이션으로 조회합니다.")
+    @GetMapping("/by-tag")
+    public Page<BookmarkResponse> getByTag(
+        @Parameter(description = "태그 이름", required = true, example = "spring")
+        @RequestParam String name,
+        @Parameter(description = "페이지 번호(0부터)") @Min(0)
+        @RequestParam(defaultValue = "0") Integer page,
+        @Parameter(description = "페이지 크기") @Min(1)
+        @RequestParam(defaultValue = "20") Integer size,
+        @Parameter(description = "정렬(필드,방향) createdAt,desc 형태. 허용: createdAt, updatedAt, title, url")
+        @RequestParam(defaultValue = "createdAt,desc") String[] sort
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(parseSort(sort)));
+        pageable = sanitizeSort(pageable, Set.of("createdAt", "updatedAt", "title", "url"));
+        return bookmarkService.getBookmarksByTag(name, pageable);
+    }
+
+    @Operation(summary = "북마크에 태그 추가", description = "지정한 북마크에 태그를 추가합니다(중복 무시).")
+    @PostMapping("/{id}/tags")
+    public ResponseEntity<BookmarkResponse> addTags(
+        @PathVariable Long id,
+        @Valid @RequestBody TagUpsertRequest request
+    ) {
+        return ResponseEntity.ok(bookmarkService.addTags(id, request));
+    }
+
+    @Operation(summary = "북마크에서 태그 제거", description = "지정한 북마크에서 태그를 제거합니다.")
+    @DeleteMapping("/{id}/tags/{tagName}")
+    public ResponseEntity<BookmarkResponse> removeTag(
+        @PathVariable Long id,
+        @PathVariable String tagName
+    ) {
+        return ResponseEntity.ok(bookmarkService.removeTag(id, tagName));
     }
 
     /**

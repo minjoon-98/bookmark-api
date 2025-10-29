@@ -1,6 +1,7 @@
 # 북마크 관리 REST API
 
 개인이 자주 방문하는 웹사이트를 관리할 수 있는 북마크 관리 시스템입니다.
+**태그 기능**을 통해 북마크를 분류하고, 태그별로 빠르게 조회할 수 있습니다.
 
 ## 목차
 - [기술 스택](#기술-스택)
@@ -33,11 +34,13 @@ src/main/java/io/github/minjoon98/bookmark/
 ├── controller/          # REST API 컨트롤러
 │   └── BookmarkController.java
 ├── domain/              # 엔티티 클래스
-│   └── Bookmark.java
+│   ├── Bookmark.java
+│   └── Tag.java
 ├── dto/                 # DTO 클래스
 │   ├── request/
 │   │   ├── BookmarkCreateRequest.java
-│   │   └── BookmarkUpdateRequest.java
+│   │   ├── BookmarkUpdateRequest.java
+│   │   └── TagUpsertRequest.java
 │   └── response/
 │       ├── BookmarkResponse.java
 │       ├── ErrorResponse.java
@@ -46,7 +49,8 @@ src/main/java/io/github/minjoon98/bookmark/
 │   ├── BookmarkNotFoundException.java
 │   └── GlobalExceptionHandler.java
 ├── repository/          # JPA Repository
-│   └── BookmarkRepository.java
+│   ├── BookmarkRepository.java
+│   └── TagRepository.java
 └── service/             # 비즈니스 로직
     ├── BookmarkService.java         # 서비스 인터페이스
     └── BookmarkServiceImpl.java     # 서비스 구현체
@@ -109,18 +113,25 @@ java -jar build/libs/bookmark-0.0.1-SNAPSHOT.jar
 
 ### 주요 엔드포인트
 
-| 기능 | 메서드 | 엔드포인트 | 설명 |
-|------|--------|-----------|------|
-| 북마크 등록 | POST | `/bookmarks` | 새로운 북마크 추가 |
-| 북마크 목록 조회 | GET | `/bookmarks` | 전체 북마크 조회 (검색, 페이지네이션, 정렬 지원) |
-| 북마크 상세 조회 | GET | `/bookmarks/{id}` | 특정 북마크 상세 정보 조회 |
-| 북마크 수정 | PUT | `/bookmarks/{id}` | 북마크 정보 수정 |
-| 북마크 삭제 | DELETE | `/bookmarks/{id}` | 북마크 삭제 |
+| 기능         | 메서드    | 엔드포인트                            | 설명                            |
+| ---------- | ------ | -------------------------------- | ----------------------------- |
+| 북마크 등록     | POST   | `/bookmarks`                     | 새로운 북마크 추가                    |
+| 북마크 목록 조회  | GET    | `/bookmarks`                     | 전체 조회 (검색 `search`, 페이지네이션, 정렬 지원) |
+| 북마크 상세 조회  | GET    | `/bookmarks/{id}`                | 특정 북마크 상세                     |
+| 북마크 수정     | PUT    | `/bookmarks/{id}`                | 북마크 정보 수정                     |
+| 북마크 삭제     | DELETE | `/bookmarks/{id}`                | 북마크 삭제                        |
+| 태그별 조회 | GET    | `/bookmarks/by-tag?name={tag}`   | 해당 태그 보유 북마크 페이지 조회           |
+| 태그 추가  | POST   | `/bookmarks/{id}/tags`           | 북마크에 태그 목록 추가                 |
+| 태그 제거  | DELETE | `/bookmarks/{id}/tags/{tagName}` | 북마크에서 태그 제거                   |
 
 ### 요청/응답 예시
 
-#### 1. 북마크 생성 (POST /bookmarks)
-**요청**
+
+<details>
+<summary><b>1) 북마크 생성 — POST /bookmarks</b></summary>
+
+**Request**
+
 ```json
 {
   "title": "Google",
@@ -129,7 +140,8 @@ java -jar build/libs/bookmark-0.0.1-SNAPSHOT.jar
 }
 ```
 
-**응답 (201 Created)**
+**Response — 201 Created**
+
 ```json
 {
   "id": 1,
@@ -137,48 +149,30 @@ java -jar build/libs/bookmark-0.0.1-SNAPSHOT.jar
   "url": "https://www.google.com",
   "memo": "검색 엔진",
   "createdAt": "2025-01-15T10:30:00",
-  "updatedAt": "2025-01-15T10:30:00"
+  "updatedAt": "2025-01-15T10:30:00",
+  "tags": []
 }
 ```
 
-#### 2. 북마크 목록 조회 (GET /bookmarks)
+</details>
+
+---
+
+<details>
+<summary><b>2) 북마크 목록 조회 — GET /bookmarks</b></summary>
+
 
 **기본 조회**
+
 ```http
 GET /bookmarks
 ```
 
-**응답 (200 OK)**
-```json
-{
-  "content": [
-    {
-      "id": 1,
-      "title": "Google",
-      "url": "https://www.google.com",
-      "memo": "검색 엔진",
-      "createdAt": "2025-01-15T10:30:00",
-      "updatedAt": "2025-01-15T10:30:00"
-    }
-  ],
-  "pageable": {
-    "pageNumber": 0,
-    "pageSize": 20
-  },
-  "totalElements": 1,
-  "totalPages": 1,
-  "size": 20,
-  "number": 0,
-  "first": true,
-  "last": true
-}
-```
-
-**검색 기능**
+**검색**
 ```http
-GET /bookmarks?q=github
+GET /bookmarks?search=github
 ```
-- `q`: 검색 키워드 (제목 또는 URL에서 부분 일치 검색, 대소문자 무시)
+- `search`: 검색 키워드 (제목 또는 URL에서 부분 일치 검색, 대소문자 무시)
 
 **페이지네이션**
 ```http
@@ -200,41 +194,61 @@ GET /bookmarks?sort=createdAt,desc&sort=title,asc
 
 **복합 사용**
 ```http
-GET /bookmarks?q=git&page=0&size=10&sort=createdAt,desc
+GET /bookmarks?search=git&page=0&size=10&sort=createdAt,desc
 ```
 
-#### 3. 북마크 수정 (PUT /bookmarks/1)
-**요청**
+**Response — 200 OK**
+
 ```json
 {
-  "title": "Google Search",
-  "memo": "세계 최고의 검색 엔진"
+  "content": [
+    {
+      "id": 1,
+      "title": "Google",
+      "url": "https://www.google.com",
+      "memo": "검색 엔진",
+      "createdAt": "2025-01-15T10:30:00",
+      "updatedAt": "2025-01-15T10:30:00",
+      "tags": ["java","spring"]
+    }
+  ],
+  "pageable": { "pageNumber": 0, "pageSize": 20 },
+  "totalElements": 1,
+  "totalPages": 1,
+  "first": true,
+  "last": true
 }
 ```
 
-**응답 (200 OK)**
+</details>
+
+---
+
+<details>
+<summary><b>3) 북마크 상세 조회 — GET /bookmarks/{id}</b></summary>
+
+**Request**
+
+```http
+GET /bookmarks/1
+```
+
+**Response — 200 OK**
+
 ```json
 {
   "id": 1,
-  "title": "Google Search",
+  "title": "Google",
   "url": "https://www.google.com",
-  "memo": "세계 최고의 검색 엔진",
+  "memo": "검색 엔진",
   "createdAt": "2025-01-15T10:30:00",
-  "updatedAt": "2025-01-15T10:40:00"
+  "updatedAt": "2025-01-15T10:30:00",
+  "tags": ["java","spring"]
 }
 ```
 
-#### 4. 북마크 삭제 (DELETE /bookmarks/1)
-**응답 (200 OK)**
-```json
-{
-  "message": "북마크가 성공적으로 삭제되었습니다"
-}
-```
+**404 예시**
 
-### 에러 응답
-
-#### 404 Not Found
 ```json
 {
   "message": "북마크를 찾을 수 없습니다. ID: 999",
@@ -243,24 +257,199 @@ GET /bookmarks?q=git&page=0&size=10&sort=createdAt,desc
 }
 ```
 
-#### 400 Bad Request (Validation Error)
+</details>
+
+---
+
+<details>
+<summary><b>4) 북마크 수정 — PUT /bookmarks/{id}</b></summary>
+
+**Request**
+
+```http
+PUT /bookmarks/1
+```
+
+```json
+{
+  "title": "Google Search",
+  "memo": "세계 최고의 검색 엔진"
+}
+```
+
+**Response — 200 OK**
+
+```json
+{
+  "id": 1,
+  "title": "Google Search",
+  "url": "https://www.google.com",
+  "memo": "세계 최고의 검색 엔진",
+  "createdAt": "2025-01-15T10:30:00",
+  "updatedAt": "2025-01-15T10:40:00",
+  "tags": ["java","spring"]
+}
+```
+
+</details>
+
+---
+
+<details>
+<summary><b>5) 북마크 삭제 — DELETE /bookmarks/{id}</b></summary>
+
+**Request**
+
+```http
+DELETE /bookmarks/1
+```
+
+**Response — 200 OK**
+
+```json
+{
+  "message": "북마크가 성공적으로 삭제되었습니다"
+}
+```
+
+</details>
+
+---
+
+<details>
+<summary><b>6) 태그별 조회 — GET /bookmarks/by-tag?name={tag}</b></summary>
+
+**Request**
+
+```http
+GET /bookmarks/by-tag?name=spring&page=0&size=20
+```
+
+**Response — 200 OK (Page)**
+
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "title": "Google",
+      "url": "https://www.google.com",
+      "memo": "검색 엔진",
+      "createdAt": "2025-01-15T10:30:00",
+      "updatedAt": "2025-01-15T10:30:00",
+      "tags": ["java","spring"]
+    }
+  ],
+  "pageable": { "pageNumber": 0, "pageSize": 20 },
+  "totalElements": 1,
+  "totalPages": 1
+}
+```
+
+</details>
+
+---
+
+<details>
+<summary><b>7) 태그 추가 — POST /bookmarks/{id}/tags</b></summary>
+
+**Request**
+
+```http
+POST /bookmarks/1/tags
+```
+
+```json
+{ "names": ["spring", "Java"] }
+```
+
+**Response — 200 OK**
+(태그는 소문자로 정규화되어 저장/노출)
+
+```json
+{
+  "id": 1,
+  "title": "Google",
+  "url": "https://www.google.com",
+  "memo": "검색 엔진",
+  "createdAt": "2025-01-15T10:30:00",
+  "updatedAt": "2025-01-15T10:30:00",
+  "tags": ["java","spring"]
+}
+```
+
+</details>
+
+---
+
+<details>
+<summary><b>8) 태그 제거 — DELETE /bookmarks/{id}/tags/{tagName}</b></summary>
+
+**Request**
+
+```http
+DELETE /bookmarks/1/tags/java
+```
+
+**Response — 200 OK**
+(제거 후 남은 태그 반환)
+
+```json
+{
+  "id": 1,
+  "title": "Google",
+  "url": "https://www.google.com",
+  "memo": "검색 엔진",
+  "createdAt": "2025-01-15T10:30:00",
+  "updatedAt": "2025-01-15T10:30:00",
+  "tags": ["spring"]
+}
+```
+
+</details>
+
+---
+
+### 태그 규칙
+
+* 저장/검색 모두 **대소문자 무시**(소문자로 정규화).
+* 동일 태그 **중복 추가는 무시**.
+* 어떤 북마크에서도 사용되지 않게 된 태그는 **정리(삭제)**.
+
+
+### 에러 응답
+
+<details>
+<summary><b>400 Bad Request (Validation Error)</b></summary>
+
 ```json
 {
   "message": "입력값 검증에 실패했습니다",
   "status": 400,
   "timestamp": "2025-01-15T10:50:00",
   "errors": [
-    {
-      "field": "title",
-      "message": "제목은 필수입니다"
-    },
-    {
-      "field": "url",
-      "message": "URL은 필수입니다"
-    }
+    { "field": "title", "message": "제목은 필수입니다" },
+    { "field": "url",   "message": "URL은 필수입니다" }
   ]
 }
 ```
+
+</details>
+
+<details>
+<summary><b>404 Not Found</b></summary>
+
+```json
+{
+  "message": "북마크를 찾을 수 없습니다. ID: 999",
+  "status": 404,
+  "timestamp": "2025-01-15T10:45:00"
+}
+```
+
+</details>
+
+---
 
 ## 테스트 실행
 
@@ -338,26 +527,7 @@ build/reports/tests/test/index.html
 
 ## 개선할 점
 
-### 1. 태그 기능 미구현
-**현재 상황**: 제목과 URL로만 검색 가능
-**개선 방향**:
-- 북마크에 여러 태그를 추가할 수 있는 Many-to-Many 관계 구현
-- 태그별 필터링 및 복합 검색 기능 추가
-
-```java
-// 개선 예시
-@Entity
-public class Tag {
-    @Id @GeneratedValue
-    private Long id;
-    private String name;
-
-    @ManyToMany(mappedBy = "tags")
-    private Set<Bookmark> bookmarks;
-}
-```
-
-### 2. 캐싱 미구현
+### 1. 캐싱 미구현
 **현재 상황**: 매 요청마다 데이터베이스 조회
 **개선 방향**:
 - Spring Cache를 활용한 자주 조회되는 데이터 캐싱
@@ -370,13 +540,6 @@ public BookmarkResponse getBookmarkById(Long id) {
     // ...
 }
 ```
-
-### 3. 테스트 커버리지 확장
-**현재 상황**: 주요 기능 중심의 단위/통합 테스트
-**개선 방향**:
-- Edge case 및 경계값 테스트 추가
-- 동시성 테스트 (동시 수정/삭제 시나리오)
-- E2E 테스트를 위한 `@SpringBootTest` 확장
 
 ## 라이선스
 본 프로젝트는 KRAFTON Intra Platform Team 백엔드 개발자 채용 과제로 작성되었습니다.

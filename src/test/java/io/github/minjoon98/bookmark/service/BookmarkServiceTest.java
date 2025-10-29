@@ -6,6 +6,7 @@ import io.github.minjoon98.bookmark.dto.response.BookmarkResponse;
 import io.github.minjoon98.bookmark.dto.request.BookmarkUpdateRequest;
 import io.github.minjoon98.bookmark.exception.BookmarkNotFoundException;
 import io.github.minjoon98.bookmark.repository.BookmarkRepository;
+import io.github.minjoon98.bookmark.repository.TagRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,13 +29,16 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class BookmarkServiceImplTest {
+class BookmarkServiceTest {
 
     @Mock
     private BookmarkRepository bookmarkRepository;
 
+    @Mock
+    private TagRepository tagRepository;
+
     @InjectMocks
-    private BookmarkServiceImpl bookmarkServiceImpl;
+    private BookmarkServiceImpl bookmarkService;
 
     @Test
     @DisplayName("북마크를 생성할 수 있다")
@@ -50,7 +54,7 @@ class BookmarkServiceImplTest {
         given(bookmarkRepository.save(any(Bookmark.class))).willReturn(bookmark);
 
         // when
-        BookmarkResponse response = bookmarkServiceImpl.createBookmark(request);
+        BookmarkResponse response = bookmarkService.createBookmark(request);
 
         // then
         assertThat(response.getTitle()).isEqualTo("Google");
@@ -68,7 +72,7 @@ class BookmarkServiceImplTest {
         given(bookmarkRepository.findAll(any(Pageable.class))).willReturn(page);
 
         // when
-        Page<BookmarkResponse> responses = bookmarkServiceImpl.getBookmarks(null, PageRequest.of(0, 20));
+        Page<BookmarkResponse> responses = bookmarkService.getBookmarks(null, PageRequest.of(0, 20));
 
         // then
         assertThat(responses.getContent()).hasSize(2);
@@ -87,7 +91,7 @@ class BookmarkServiceImplTest {
         given(bookmarkRepository.findById(id)).willReturn(Optional.of(bookmark));
 
         // when
-        BookmarkResponse response = bookmarkServiceImpl.getBookmarkById(id);
+        BookmarkResponse response = bookmarkService.getBookmarkById(id);
 
         // then
         assertThat(response.getTitle()).isEqualTo("Google");
@@ -102,7 +106,7 @@ class BookmarkServiceImplTest {
         given(bookmarkRepository.findById(id)).willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> bookmarkServiceImpl.getBookmarkById(id))
+        assertThatThrownBy(() -> bookmarkService.getBookmarkById(id))
                 .isInstanceOf(BookmarkNotFoundException.class);
     }
 
@@ -121,7 +125,7 @@ class BookmarkServiceImplTest {
         given(bookmarkRepository.findById(id)).willReturn(Optional.of(bookmark));
 
         // when
-        BookmarkResponse response = bookmarkServiceImpl.updateBookmark(id, request);
+        BookmarkResponse response = bookmarkService.updateBookmark(id, request);
 
         // then
         assertThat(response.getTitle()).isEqualTo("Updated Title");
@@ -138,7 +142,7 @@ class BookmarkServiceImplTest {
         doNothing().when(bookmarkRepository).deleteById(id);
 
         // when
-        bookmarkServiceImpl.deleteBookmark(id);
+        bookmarkService.deleteBookmark(id);
 
         // then
         verify(bookmarkRepository, times(1)).existsById(id);
@@ -153,7 +157,7 @@ class BookmarkServiceImplTest {
         given(bookmarkRepository.existsById(id)).willReturn(false);
 
         // when & then
-        assertThatThrownBy(() -> bookmarkServiceImpl.deleteBookmark(id))
+        assertThatThrownBy(() -> bookmarkService.deleteBookmark(id))
                 .isInstanceOf(BookmarkNotFoundException.class);
     }
 
@@ -169,7 +173,7 @@ class BookmarkServiceImplTest {
                 .willReturn(page);
 
         // when
-        Page<BookmarkResponse> responses = bookmarkServiceImpl.getBookmarks(keyword, PageRequest.of(0, 20));
+        Page<BookmarkResponse> responses = bookmarkService.getBookmarks(keyword, PageRequest.of(0, 20));
 
         // then
         assertThat(responses.getContent()).hasSize(1);
