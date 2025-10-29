@@ -113,6 +113,21 @@ java -jar build/libs/bookmark-0.0.1-SNAPSHOT.jar
 
 > 📗 정적 API 명세는 [docs/api-spec.md](docs/api-spec.md) 문서를 참고하세요.
 
+
+### 주요 엔드포인트
+
+| 기능         | 메서드    | 엔드포인트                            | 설명                            |
+| ---------- | ------ | -------------------------------- | ----------------------------- |
+| 북마크 등록     | POST   | `/bookmarks`                     | 새로운 북마크 추가                    |
+| 북마크 목록 조회  | GET    | `/bookmarks`                     | 전체 조회 (검색 `search`, 페이지네이션, 정렬 지원) |
+| 북마크 상세 조회  | GET    | `/bookmarks/{id}`                | 특정 북마크 상세                     |
+| 북마크 수정     | PUT    | `/bookmarks/{id}`                | 북마크 정보 수정                     |
+| 북마크 삭제     | DELETE | `/bookmarks/{id}`                | 북마크 삭제                        |
+| 태그별 조회 | GET    | `/bookmarks/by-tag?name={tag}`   | 해당 태그 보유 북마크 페이지 조회           |
+| 태그 추가  | POST   | `/bookmarks/{id}/tags`           | 북마크에 태그 목록 추가                 |
+| 태그 제거  | DELETE | `/bookmarks/{id}/tags/{tagName}` | 북마크에서 태그 제거                   |
+
+
 ---
 
 ## 테스트 실행
