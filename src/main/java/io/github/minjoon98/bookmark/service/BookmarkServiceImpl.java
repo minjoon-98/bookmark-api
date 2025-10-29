@@ -55,12 +55,12 @@ public class BookmarkServiceImpl implements BookmarkService {
     @Caching(cacheable = {
         @Cacheable(
             cacheNames = "bookmarksFirstPage",
-            key = "T(io.github.minjoon98.bookmark.service.CacheKeyGenerator).pageKey(#pageable)",
+            keyGenerator = "pageableKeyGenerator",
             condition = "#q == null && #pageable.pageNumber == 0"
         ),
         @Cacheable(
             cacheNames = "bookmarksSearch",
-            key = "#q + '|' + T(io.github.minjoon98.bookmark.service.CacheKeyGenerator).pageKey(#pageable)",
+            keyGenerator = "searchKeyGenerator",
             condition = "#q != null && #q.length() >= 2 && #pageable.pageNumber <= 2"
         )
     })
@@ -135,7 +135,7 @@ public class BookmarkServiceImpl implements BookmarkService {
      */
     @Cacheable(
         cacheNames = "bookmarksByTag",
-        key = "#tagName + '|' + T(io.github.minjoon98.bookmark.service.CacheKeyGenerator).pageKey(#pageable)",
+        keyGenerator = "tagSearchKeyGenerator",
         condition = "#pageable.pageNumber <= 2"
     )
     @Override
