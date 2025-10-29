@@ -1,6 +1,6 @@
 package io.github.minjoon98.bookmark.repository;
 
-import io.github.minjoon98.bookmark.domain.Tag;
+import io.github.minjoon98.bookmark.entity.Tag;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
