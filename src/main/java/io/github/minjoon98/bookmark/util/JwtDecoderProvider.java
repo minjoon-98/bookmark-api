@@ -1,4 +1,4 @@
-package io.github.minjoon98.bookmark.config;
+package io.github.minjoon98.bookmark.util;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.jwt.JwtDecoder;

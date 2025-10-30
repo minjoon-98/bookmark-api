@@ -1,4 +1,4 @@
-package io.github.minjoon98.bookmark.config;
+package io.github.minjoon98.bookmark.util;
 
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;

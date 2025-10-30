@@ -1,5 +1,6 @@
 package io.github.minjoon98.bookmark.config;
 
+import io.github.minjoon98.bookmark.util.JwtDecoderProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

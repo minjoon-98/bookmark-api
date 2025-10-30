@@ -1,6 +1,6 @@
 package io.github.minjoon98.bookmark.service;
 
-import io.github.minjoon98.bookmark.config.IssueTokenResolver;
+import io.github.minjoon98.bookmark.util.IssueTokenResolver;
 import io.github.minjoon98.bookmark.dto.request.LoginRequest;
 import io.github.minjoon98.bookmark.dto.request.SignUpRequest;
 import io.github.minjoon98.bookmark.dto.response.LoginResponse;
@@ -46,6 +46,6 @@ public class AuthService {
         }
 
         String token = issueTokenResolver.issueToken(user);
-        return new LoginResponse(token);
+        return new LoginResponse(token, user.getEmail());
     }
 }

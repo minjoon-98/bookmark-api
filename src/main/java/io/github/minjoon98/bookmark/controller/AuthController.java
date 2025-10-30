@@ -66,4 +66,17 @@ public class AuthController {
         LoginResponse response = authService.login(request);
         return ResponseEntity.ok(response);
     }
+
+    @Operation(
+            summary = "로그아웃",
+            description = "로그아웃 처리. JWT는 stateless 방식이므로 클라이언트에서 토큰을 삭제해야 합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "로그아웃 성공",
+                    content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+    })
+    @PostMapping("/logout")
+    public ResponseEntity<MessageResponse> logout() {
+        return ResponseEntity.ok(MessageResponse.of("로그아웃되었습니다. 클라이언트에서 토큰을 삭제해주세요."));
+    }
 }

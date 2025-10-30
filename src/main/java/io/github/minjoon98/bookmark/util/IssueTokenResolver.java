@@ -1,4 +1,4 @@
-package io.github.minjoon98.bookmark.config;
+package io.github.minjoon98.bookmark.util;
 
 import io.github.minjoon98.bookmark.entity.User;
 import io.jsonwebtoken.Jwts;

@@ -14,7 +14,6 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder
 public class BookmarkTag {
 
     @Id
@@ -34,6 +33,12 @@ public class BookmarkTag {
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Builder
+    private BookmarkTag(Bookmark bookmark, Tag tag) {
+        this.bookmark = bookmark;
+        this.tag = tag;
+    }
 
     // 연관관계 편의 메서드(양방향 세팅)
     public static BookmarkTag link(Bookmark bookmark, Tag tag) {
