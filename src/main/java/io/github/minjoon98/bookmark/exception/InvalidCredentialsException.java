@@ -1,8 +1,21 @@
 package io.github.minjoon98.bookmark.exception;
 
-public class InvalidCredentialsException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+import io.github.minjoon98.bookmark.global.exception.BookmarkException;
+
+import static io.github.minjoon98.bookmark.exception.AuthExceptionConstant.INVALID_CREDENTIALS;
+
+public class InvalidCredentialsException extends BookmarkException {
+
+    private static final AuthExceptionConstant constant = INVALID_CREDENTIALS;
 
     public InvalidCredentialsException() {
-        super("이메일 또는 비밀번호가 올바르지 않습니다");
+        super(constant.getMessage());
+    }
+
+    @Override
+    public HttpStatus getStatus() {
+        return constant.getHttpStatus();
     }
 }

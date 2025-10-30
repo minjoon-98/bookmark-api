@@ -123,7 +123,7 @@ class AuthServiceTest {
         // when & then
         assertThatThrownBy(() -> authService.login(request))
                 .isInstanceOf(InvalidCredentialsException.class)
-                .hasMessage("이메일 또는 비밀번호가 올바르지 않습니다");
+                .hasMessage("이메일 또는 비밀번호가 올바르지 않습니다.");
 
         verify(userRepository, times(1)).findByEmail("nonexistent@example.com");
         verify(passwordEncoder, never()).matches(anyString(), anyString());
@@ -141,7 +141,7 @@ class AuthServiceTest {
         // when & then
         assertThatThrownBy(() -> authService.login(request))
                 .isInstanceOf(InvalidCredentialsException.class)
-                .hasMessage("이메일 또는 비밀번호가 올바르지 않습니다");
+                .hasMessage("이메일 또는 비밀번호가 올바르지 않습니다.");
 
         verify(userRepository, times(1)).findByEmail("test@example.com");
         verify(passwordEncoder, times(1)).matches("wrongPassword", "encodedPassword");
