@@ -39,7 +39,7 @@ class AuthServiceTest {
     private IssueTokenResolver issueTokenResolver;
 
     @InjectMocks
-    private AuthService authService;
+    private AuthServiceImpl authService;
 
     private User testUser;
 
