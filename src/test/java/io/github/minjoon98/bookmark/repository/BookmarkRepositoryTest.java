@@ -1,6 +1,8 @@
 package io.github.minjoon98.bookmark.repository;
 
-import io.github.minjoon98.bookmark.domain.Bookmark;
+import io.github.minjoon98.bookmark.entity.Bookmark;
+import io.github.minjoon98.bookmark.entity.User;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +20,19 @@ class BookmarkRepositoryTest {
     @Autowired
     private BookmarkRepository bookmarkRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    private User testUser;
+
+    @BeforeEach
+    void setUp() {
+        testUser = userRepository.save(User.builder()
+                .email("test@example.com")
+                .password("password")
+                .build());
+    }
+
     @Test
     @DisplayName("북마크를 저장하고 조회할 수 있다")
     void saveAndFindBookmark() {
@@ -26,6 +41,7 @@ class BookmarkRepositoryTest {
                 .title("Google")
                 .url("https://www.google.com")
                 .memo("검색 엔진")
+                .user(testUser)
                 .build();
 
         // when
@@ -46,6 +62,7 @@ class BookmarkRepositoryTest {
                 .title("GitHub")
                 .url("https://github.com")
                 .memo("코드 저장소")
+                .user(testUser)
                 .build();
         Bookmark saved = bookmarkRepository.save(bookmark);
 
@@ -58,25 +75,28 @@ class BookmarkRepositoryTest {
     }
 
     @Test
-    @DisplayName("제목이나 URL로 북마크를 검색할 수 있다 (대소문자 무시)")
+    @DisplayName("사용자별로 제목이나 URL로 북마크를 검색할 수 있다 (대소문자 무시)")
     void searchByTitleOrUrl() {
         // given
         bookmarkRepository.save(Bookmark.builder()
                 .title("Google")
                 .url("https://www.google.com")
+                .user(testUser)
                 .build());
         bookmarkRepository.save(Bookmark.builder()
                 .title("GitHub")
                 .url("https://github.com")
+                .user(testUser)
                 .build());
         bookmarkRepository.save(Bookmark.builder()
                 .title("Stack Overflow")
                 .url("https://stackoverflow.com")
+                .user(testUser)
                 .build());
 
         // when
-        Page<Bookmark> results = bookmarkRepository.findByTitleContainingIgnoreCaseOrUrlContainingIgnoreCase(
-                "git", "git", PageRequest.of(0, 10));
+        Page<Bookmark> results = bookmarkRepository.findByUserAndTitleContainingIgnoreCaseOrUserAndUrlContainingIgnoreCase(
+                testUser, "git", testUser, "git", PageRequest.of(0, 10));
 
         // then
         assertThat(results.getContent()).hasSize(1);
@@ -90,6 +110,7 @@ class BookmarkRepositoryTest {
         Bookmark bookmark = Bookmark.builder()
                 .title("Test")
                 .url("https://test.com")
+                .user(testUser)
                 .build();
         Bookmark saved = bookmarkRepository.save(bookmark);
 

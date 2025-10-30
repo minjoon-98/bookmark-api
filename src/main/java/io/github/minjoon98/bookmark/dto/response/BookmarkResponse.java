@@ -1,7 +1,9 @@
 package io.github.minjoon98.bookmark.dto.response;
 
-import io.github.minjoon98.bookmark.domain.Bookmark;
+import io.github.minjoon98.bookmark.entity.Bookmark;
+import io.github.minjoon98.bookmark.entity.Tag;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -32,14 +34,24 @@ public class BookmarkResponse {
     @Schema(description = "수정 일시", example = "2025-01-15T10:30:00")
     private LocalDateTime updatedAt;
 
+    @Schema(description = "태그 목록", example = "[\"spring\",\"java\"]")
+    private List<String> tags;
+
     public static BookmarkResponse from(Bookmark bookmark) {
         return BookmarkResponse.builder()
-                .id(bookmark.getId())
-                .title(bookmark.getTitle())
-                .url(bookmark.getUrl())
-                .memo(bookmark.getMemo())
-                .createdAt(bookmark.getCreatedAt())
-                .updatedAt(bookmark.getUpdatedAt())
-                .build();
+            .id(bookmark.getId())
+            .title(bookmark.getTitle())
+            .url(bookmark.getUrl())
+            .memo(bookmark.getMemo())
+            .createdAt(bookmark.getCreatedAt())
+            .updatedAt(bookmark.getUpdatedAt())
+            .tags(
+                bookmark.getBookmarkTags().stream()
+                    .map(bt -> bt.getTag().getName()) // BookmarkTag -> Tag -> name
+                    .distinct()                       // 같은 태그 중복 방지
+                    .sorted()
+                    .toList()
+            )
+            .build();
     }
 }

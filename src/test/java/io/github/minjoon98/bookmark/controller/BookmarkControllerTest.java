@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -29,7 +30,8 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(BookmarkController.class)
+@WebMvcTest(controllers = BookmarkController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class BookmarkControllerTest {
 
     @Autowired
@@ -171,8 +173,7 @@ class BookmarkControllerTest {
         given(bookmarkService.getBookmarks(eq(keyword), any(Pageable.class))).willReturn(page);
 
         // when & then
-        mockMvc.perform(get("/bookmarks")
-                        .param("q", keyword))
+        mockMvc.perform(get("/bookmarks").param("search", keyword))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].title").value("GitHub"))
@@ -229,12 +230,75 @@ class BookmarkControllerTest {
 
         // when & then
         mockMvc.perform(get("/bookmarks")
-                        .param("q", keyword)
+                        .param("search", keyword)
                         .param("page", "0")
                         .param("size", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].title").value("GitHub"))
                 .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    @DisplayName("태그별 조회 API 테스트")
+    void getByTag() throws Exception {
+        LocalDateTime now = LocalDateTime.now();
+        Page<BookmarkResponse> page = new PageImpl<>(
+            List.of(BookmarkResponse.builder()
+                .id(1L)
+                .title("Google")
+                .url("https://google.com")
+                .createdAt(now)
+                .updatedAt(now)
+                .build()),
+            PageRequest.of(0, 20), 1
+        );
+        given(bookmarkService.getBookmarksByTag(eq("spring"), any(Pageable.class))).willReturn(page);
+
+        mockMvc.perform(get("/bookmarks/by-tag").param("name", "spring"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.content[0].title").value("Google"));
+    }
+
+    @Test
+    @DisplayName("태그 추가/제거 API 테스트")
+    void addAndRemoveTags() throws Exception {
+        Long id = 1L;
+        LocalDateTime now = LocalDateTime.now();
+        BookmarkResponse withTags = BookmarkResponse.builder()
+            .id(id)
+            .title("Google")
+            .url("https://google.com")
+            .tags(List.of("java", "spring"))
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+        BookmarkResponse afterRemove = BookmarkResponse.builder()
+            .id(id)
+            .title("Google")
+            .url("https://google.com")
+            .tags(List.of("spring"))
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+
+        given(bookmarkService.addTags(eq(id), any())).willReturn(withTags);
+        given(bookmarkService.removeTag(id, "java")).willReturn(afterRemove);
+
+        // add
+        mockMvc.perform(post("/bookmarks/{id}/tags", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"names\":[\"spring\",\"Java\"]}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tags.length()").value(2))
+            .andExpect(jsonPath("$.tags[0]").value("java"))
+            .andExpect(jsonPath("$.tags[1]").value("spring"));
+
+        // remove
+        mockMvc.perform(delete("/bookmarks/{id}/tags/{tag}", id, "java"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tags.length()").value(1))
+            .andExpect(jsonPath("$.tags[0]").value("spring"));
     }
 }

@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [ main, develop ]
+
+permissions:
+  contents: read
+  checks: write   # test-reporter가 체크런을 남길 수 있도록
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Gradle Wrapper
+        uses: gradle/wrapper-validation-action@v2
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # 테스트를 먼저 실행하되, 실패해도 다음 단계로 진행(리포트 생성 위해)
+      - name: Run tests
+        run: ./gradlew test --no-daemon --stacktrace
+        continue-on-error: true
+
+      - name: Publish test report (Checks)
+        if: ${{ always() }}
+        uses: dorny/test-reporter@v1
+        with:
+          name: JUnit Test Results
+          path: build/test-results/test/*.xml
+          reporter: java-junit
+          fail-on-error: true   # 테스트 실패면 이 단계에서 잡 전체를 실패로 표시
+
+      # 빌드는 테스트를 다시 돌지 않도록 -x test (이미 위에서 실행했고 리포트 처리함)
+      - name: Build (without tests)
+        run: ./gradlew bootJar -x test --no-daemon --stacktrace
+
+      - name: Upload JAR artifact
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-jar
+          path: build/libs/*.jar
+          retention-days: 7
+
+      - name: Upload raw test XMLs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-xml
+          path: build/test-results/test/*.xml
+          retention-days: 7

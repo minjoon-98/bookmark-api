@@ -1,6 +1,7 @@
 # 북마크 관리 REST API
 
 개인이 자주 방문하는 웹사이트를 관리할 수 있는 북마크 관리 시스템입니다.
+**태그 기능**을 통해 북마크를 분류하고, 태그별로 빠르게 조회할 수 있습니다.
 
 ## 목차
 - [기술 스택](#기술-스택)
@@ -18,6 +19,7 @@
 - **Build Tool**: Gradle
 - **Test**: JUnit 5, Mockito, MockMvc
 - **API Documentation**: Swagger/OpenAPI (SpringDoc)
+- **CI**: GitHub Actions
 - **Libraries**:
   - Spring Data JPA
   - Lombok
@@ -26,29 +28,75 @@
 ## 프로젝트 구조
 
 ```
-src/main/java/io/github/minjoon98/bookmark/
-├── config/              # 설정 클래스
-│   └── OpenApiConfig.java
-├── controller/          # REST API 컨트롤러
-│   └── BookmarkController.java
-├── domain/              # 엔티티 클래스
-│   └── Bookmark.java
-├── dto/                 # DTO 클래스
-│   ├── request/
-│   │   ├── BookmarkCreateRequest.java
-│   │   └── BookmarkUpdateRequest.java
-│   └── response/
-│       ├── BookmarkResponse.java
-│       ├── ErrorResponse.java
-│       └── MessageResponse.java
-├── exception/           # 예외 처리
-│   ├── BookmarkNotFoundException.java
-│   └── GlobalExceptionHandler.java
-├── repository/          # JPA Repository
-│   └── BookmarkRepository.java
-└── service/             # 비즈니스 로직
-    ├── BookmarkService.java         # 서비스 인터페이스
-    └── BookmarkServiceImpl.java     # 서비스 구현체
+bookmark-api/
+├── .github/
+│   └── workflows/
+│       └── ci.yml                        # GitHub Actions CI 설정
+├── src/main/java/io/github/minjoon98/bookmark/
+│   ├── config/                           # 애플리케이션 설정 관련
+│   │   ├── CacheConfig.java              # Caffeine 캐시 설정
+│   │   ├── CacheKeyConfig.java           # 캐시 키 전략 (Pageable, 검색어 등)
+│   │   ├── OpenApiConfig.java            # Swagger / OpenAPI 설정
+│   │   ├── SecurityConfig.java           # Spring Security + JWT 설정
+│   ├── controller/                       # REST API 컨트롤러 계층
+│   │   ├── AuthController.java           # 회원가입 / 로그인 / 로그아웃 API
+│   │   └── BookmarkController.java       # 북마크 CRUD 및 태그 기능 API
+│   ├── docs/                             # API 문서용 클래스
+│   │   ├── AuthApiDoc.java               # 인증 API 문서
+│   │   └── BookmarkApiDoc.java           # 북마크 API 문서
+│   ├── dto/                              # 계층 간 데이터 전달 객체 (DTO)
+│   │   ├── request/                      # 클라이언트 요청 DTO
+│   │   │   ├── SignUpRequest.java        # 회원가입 요청
+│   │   │   ├── LoginRequest.java         # 로그인 요청
+│   │   │   ├── BookmarkCreateRequest.java# 북마크 생성 요청
+│   │   │   ├── BookmarkUpdateRequest.java# 북마크 수정 요청
+│   │   │   └── TagUpsertRequest.java     # 태그 추가/수정 요청
+│   │   └── response/                     # 서버 응답 DTO
+│   │       ├── BookmarkResponse.java     # 북마크 응답
+│   │       ├── MessageResponse.java      # 단순 메시지 응답
+│   │       ├── ErrorResponse.java        # 에러 응답 (상태, 메시지 포함)
+│   │       └── LoginResponse.java        # 로그인 응답 (JWT 토큰 포함)
+│   ├── entity/                           # JPA 엔티티 (DB 매핑 클래스)
+│   │   ├── User.java                     # 사용자 엔티티 (이메일, 비밀번호)
+│   │   ├── Bookmark.java                 # 북마크 엔티티
+│   │   ├── Tag.java                      # 태그 엔티티
+│   │   └── BookmarkTag.java              # 북마크-태그 매핑 엔티티 (중간 테이블)
+│   ├── exception/                        # 도메인별 커스텀 예외 정의
+│   │   ├── BookmarkNotFoundException.java# 북마크 미존재 예외
+│   │   ├── DuplicateEmailException.java  # 이메일 중복 예외
+│   │   ├── InvalidCredentialsException.java # 로그인 자격 증명 오류
+│   │   ├── UserNotFoundException.java    # 사용자 미존재 예외
+│   │   ├── AuthExceptionConstant.java    # 인증 관련 예외 상수
+│   │   └── BookmarkExceptionConstant.java# 북마크 관련 예외 상수
+│   ├── global/exception/                 # 공통 예외 처리 계층
+│   │   ├── BookmarkException.java        # 공통 예외 추상 클래스
+│   │   └── GlobalExceptionHandler.java   # @RestControllerAdvice 전역 예외 처리기
+│   ├── repository/                       # 데이터 접근 계층 (JPA Repository)
+│   │   ├── UserRepository.java           # 사용자 CRUD 및 이메일 조회
+│   │   ├── BookmarkRepository.java       # 북마크 CRUD 및 사용자 기반 조회
+│   │   └── TagRepository.java            # 태그 CRUD 및 이름 기반 조회
+│   ├── service/                          # 비즈니스 로직 계층
+│   │   ├── AuthService.java              # 인증/인가 서비스
+│   │   ├── BookmarkService.java          # 북마크 서비스 인터페이스
+│   │   └── BookmarkServiceImpl.java      # 북마크 서비스 구현체
+│   └── util/                             # 공통 유틸리티
+│       ├── IssueTokenResolver.java       # JWT 토큰 발급/서명 처리
+│       ├── JwtKeyHolder.java             # JWT 비밀키 관리
+│       └── JwtDecoderProvider.java       # JWT 검증용 디코더 제공
+└── src/test/java/io/github/minjoon98/bookmark/ # 테스트 코드
+    ├── controller/                       # Controller 단위 테스트
+    │   ├── AuthControllerTest.java
+    │   └── BookmarkControllerTest.java
+    ├── repository/                       # Repository 단위 테스트
+    │   ├── UserRepositoryTest.java
+    │   ├── TagRepositoryTest.java
+    │   └── BookmarkRepositoryTest.java
+    ├── service/                          # Service 단위 테스트
+    │   ├── AuthServiceTest.java
+    │   ├── BookmarkServiceTest.java
+    │   ├── BookmarkServiceCacheTest.java
+    │   └── BookmarkServiceTagTest.java
+    └── BookmarkApplicationTests.java     # 전체 애플리케이션 통합 테스트
 ```
 
 ### 패키지 구성 설명
@@ -106,160 +154,25 @@ java -jar build/libs/bookmark-0.0.1-SNAPSHOT.jar
 ### Swagger를 통한 API 문서 확인
 애플리케이션 실행 후 **http://localhost:8080/swagger-ui.html** 에서 전체 API 명세를 확인할 수 있습니다.
 
+> 📗 정적 API 명세는 [api-spec.md](api-spec.md) 문서를 참고해주세요.
+
 ### 주요 엔드포인트
 
-| 기능 | 메서드 | 엔드포인트 | 설명 |
-|------|--------|-----------|------|
-| 북마크 등록 | POST | `/bookmarks` | 새로운 북마크 추가 |
-| 북마크 목록 조회 | GET | `/bookmarks` | 전체 북마크 조회 (검색, 페이지네이션, 정렬 지원) |
-| 북마크 상세 조회 | GET | `/bookmarks/{id}` | 특정 북마크 상세 정보 조회 |
-| 북마크 수정 | PUT | `/bookmarks/{id}` | 북마크 정보 수정 |
-| 북마크 삭제 | DELETE | `/bookmarks/{id}` | 북마크 삭제 |
+| 기능        | 메서드    | 엔드포인트                            | 인증 | 설명                |
+| --------- | ------ | -------------------------------- | -- | ----------------- |
+| 회원가입      | POST   | `/auth/signup`                   | ❌  | 이메일, 비밀번호로 사용자 등록 |
+| 로그인       | POST   | `/auth/login`                    | ❌  | JWT 발급            |
+| 로그아웃      | POST   | `/auth/logout`                   | ✅  | 클라이언트 토큰 폐기       |
+| 북마크 등록    | POST   | `/bookmarks`                     | ✅  | 새 북마크 생성          |
+| 북마크 목록 조회 | GET    | `/bookmarks`                     | ✅  | 전체/검색/페이지 조회      |
+| 북마크 상세 조회 | GET    | `/bookmarks/{id}`                | ✅  | 단일 북마크 조회         |
+| 북마크 수정    | PUT    | `/bookmarks/{id}`                | ✅  | 타이틀, URL, 메모 수정   |
+| 북마크 삭제    | DELETE | `/bookmarks/{id}`                | ✅  | 북마크 삭제            |
+| 태그 추가     | POST   | `/bookmarks/{id}/tags`           | ✅  | 태그 등록             |
+| 태그 제거     | DELETE | `/bookmarks/{id}/tags/{tagName}` | ✅  | 태그 삭제             |
+| 태그별 조회    | GET    | `/bookmarks/by-tag?name={tag}`   | ✅  | 태그 기반 조회          |
 
-### 요청/응답 예시
-
-#### 1. 북마크 생성 (POST /bookmarks)
-**요청**
-```json
-{
-  "title": "Google",
-  "url": "https://www.google.com",
-  "memo": "검색 엔진"
-}
-```
-
-**응답 (201 Created)**
-```json
-{
-  "id": 1,
-  "title": "Google",
-  "url": "https://www.google.com",
-  "memo": "검색 엔진",
-  "createdAt": "2025-01-15T10:30:00",
-  "updatedAt": "2025-01-15T10:30:00"
-}
-```
-
-#### 2. 북마크 목록 조회 (GET /bookmarks)
-
-**기본 조회**
-```http
-GET /bookmarks
-```
-
-**응답 (200 OK)**
-```json
-{
-  "content": [
-    {
-      "id": 1,
-      "title": "Google",
-      "url": "https://www.google.com",
-      "memo": "검색 엔진",
-      "createdAt": "2025-01-15T10:30:00",
-      "updatedAt": "2025-01-15T10:30:00"
-    }
-  ],
-  "pageable": {
-    "pageNumber": 0,
-    "pageSize": 20
-  },
-  "totalElements": 1,
-  "totalPages": 1,
-  "size": 20,
-  "number": 0,
-  "first": true,
-  "last": true
-}
-```
-
-**검색 기능**
-```http
-GET /bookmarks?q=github
-```
-- `q`: 검색 키워드 (제목 또는 URL에서 부분 일치 검색, 대소문자 무시)
-
-**페이지네이션**
-```http
-GET /bookmarks?page=0&size=10
-```
-- `page`: 페이지 번호 (0부터 시작, 기본값: 0)
-- `size`: 페이지 크기 (기본값: 20)
-
-**정렬**
-```http
-GET /bookmarks?sort=title,asc
-GET /bookmarks?sort=createdAt,desc&sort=title,asc
-```
-- `sort`: 정렬 기준 필드와 방향 (형식: `필드명,방향`)
-- 허용 필드: `createdAt`, `updatedAt`, `title`, `url`
-- 방향: `asc` (오름차순) 또는 `desc` (내림차순)
-- 기본값: `createdAt,desc` (최신순)
-- 다중 정렬 가능
-
-**복합 사용**
-```http
-GET /bookmarks?q=git&page=0&size=10&sort=createdAt,desc
-```
-
-#### 3. 북마크 수정 (PUT /bookmarks/1)
-**요청**
-```json
-{
-  "title": "Google Search",
-  "memo": "세계 최고의 검색 엔진"
-}
-```
-
-**응답 (200 OK)**
-```json
-{
-  "id": 1,
-  "title": "Google Search",
-  "url": "https://www.google.com",
-  "memo": "세계 최고의 검색 엔진",
-  "createdAt": "2025-01-15T10:30:00",
-  "updatedAt": "2025-01-15T10:40:00"
-}
-```
-
-#### 4. 북마크 삭제 (DELETE /bookmarks/1)
-**응답 (200 OK)**
-```json
-{
-  "message": "북마크가 성공적으로 삭제되었습니다"
-}
-```
-
-### 에러 응답
-
-#### 404 Not Found
-```json
-{
-  "message": "북마크를 찾을 수 없습니다. ID: 999",
-  "status": 404,
-  "timestamp": "2025-01-15T10:45:00"
-}
-```
-
-#### 400 Bad Request (Validation Error)
-```json
-{
-  "message": "입력값 검증에 실패했습니다",
-  "status": 400,
-  "timestamp": "2025-01-15T10:50:00",
-  "errors": [
-    {
-      "field": "title",
-      "message": "제목은 필수입니다"
-    },
-    {
-      "field": "url",
-      "message": "URL은 필수입니다"
-    }
-  ]
-}
-```
+---
 
 ## 테스트 실행
 
@@ -291,16 +204,11 @@ build/reports/tests/test/index.html
 - 의존성 최소화로 누구나 쉽게 실행 가능
 - 애플리케이션 재시작 시 자동으로 초기화되어 테스트에 용이
 
-### 2. DTO 패턴 사용
-**이유**:
-- Entity와 API 응답의 분리를 통한 계층 간 결합도 감소
-- API 스펙 변경 시 도메인 모델에 영향 최소화
-- 민감한 정보 노출 방지 및 필요한 데이터만 전송
+### 2. Stateless 인증 (JWT)
 
-**구조**:
-- `BookmarkCreateRequest`: 생성 시 필수 값 검증
-- `BookmarkUpdateRequest`: 수정 시 선택적 필드 업데이트
-- `BookmarkResponse`: 클라이언트에게 전달할 데이터만 포함
+- 세션 대신 JWT를 통해 사용자 인증 상태 유지
+- 서버 확장성 향상 및 RESTful 아키텍처 준수
+- 토큰 서명 및 검증: JwtKeyHolder + IssueTokenResolver
 
 ### 3. 인터페이스 기반 서비스 설계 (DIP)
 **이유**:
@@ -325,57 +233,44 @@ build/reports/tests/test/index.html
 - 에러: `ErrorResponse` (메시지, 상태, 타임스탬프, 상세 오류)
 
 ### 5. @RestControllerAdvice를 통한 전역 예외 처리
-**이유**:
-- 모든 컨트롤러에서 일관된 에러 응답 형식 제공
-- 중복 코드 제거 및 유지보수성 향상
-- HTTP 상태 코드와 에러 메시지의 표준화
 
-**처리 예외**:
-- `BookmarkNotFoundException`: 404 응답
-- `MethodArgumentNotValidException`: 400 응답 (필드별 검증 오류)
-- `Exception`: 500 응답 (예상치 못한 서버 오류)
+- @RestControllerAdvice + ErrorResponse 표준화
+- 검증 실패(400), 인증 오류(401), 권한 오류(403), 자원 없음(404)
+- 예외 상수 분리(AuthExceptionConstant, BookmarkExceptionConstant)
 
-## 개선할 점
+### 6. 캐싱 전략 (Caffeine 기반)
 
-### 1. 페이지네이션 미구현
-**현재 상황**: 전체 북마크를 한 번에 조회
-**개선 방향**:
-- Spring Data JPA의 `Pageable`을 활용한 페이지네이션 구현
-- 대량의 데이터 조회 시 성능 개선
+**이유:**
+- 북마크 서비스는 읽기 비중이 매우 높아, 조회 속도 최적화가 필요함.
+- 단건·목록·태그별 조회의 반복 요청을 줄이기 위해 Spring Cache 적용.
 
-```java
-// 개선 예시
-public Page<BookmarkResponse> getAllBookmarks(Pageable pageable) {
-    return bookmarkRepository.findAll(pageable)
-        .map(BookmarkResponse::from);
-}
-```
+**구현:**
+- `CaffeineCacheManager` 기반 로컬 인메모리 캐시.
+- KeyGenerator 빈(`pageableKeyGenerator`, `searchKeyGenerator`, `tagSearchKeyGenerator`)을 통해 캐시 키 자동 생성.
+- Look-aside 전략으로 캐시 미스 시 DB 조회 후 캐시 적재.
+- 생성·수정·삭제 시 관련 캐시 자동 무효화.
 
-### 2. 태그 기능 미구현
-**현재 상황**: 제목과 URL로만 검색 가능
-**개선 방향**:
-- 북마크에 여러 태그를 추가할 수 있는 Many-to-Many 관계 구현
-- 태그별 필터링 및 복합 검색 기능 추가
+> 📘 자세한 TTL, 캐시 정책, 키 설계 등은 [cache-design.md](cache-design.md) 참고해주세요.
 
-```java
-// 개선 예시
-@Entity
-public class Tag {
-    @Id @GeneratedValue
-    private Long id;
-    private String name;
 
-    @ManyToMany(mappedBy = "tags")
-    private Set<Bookmark> bookmarks;
-}
-```
+## AI 활용 내역
 
-### 3. 테스트 커버리지 확장
-**현재 상황**: 주요 기능 중심의 단위/통합 테스트
-**개선 방향**:
-- Edge case 및 경계값 테스트 추가
-- 동시성 테스트 (동시 수정/삭제 시나리오)
-- E2E 테스트를 위한 `@SpringBootTest` 확장
+본 프로젝트는 AI를 효율적 학습·문서화 도구로 활용하였습니다.
+핵심 로직, 인증 구조, 캐싱, 예외 처리는 직접 설계 및 구현했습니다.
+
+| 목적             | 도구              | 활용 내용                                      |
+| -------------- | --------------- | ------------------------------------------ |
+| 개념 이해 및 오류 디버깅 | ChatGPT (GPT-5) | Spring Security, JWT 구조, Caffeine 캐시 설정 질의 |
+| 문서 정리 및 초안     | ChatGPT (GPT-5) | README, API 문서, 예외 설명 초안 정리                |
+| 코드 리팩토링 보조     | Claude Code     | 테스트 템플릿, DTO 변환, 주석 정리                     |
+
+**검증 방식**
+
+* 생성 코드 전량 테스트 통과 확인
+* 인증·예외·캐시·비즈니스 로직 직접 검증
+* 모든 코드 동작 원리 직접 설명 가능
+
+자세한 **AI 활용 방안은 [ai-notes.md](ai-notes.md) 참고해주세요.
 
 ## 라이선스
 본 프로젝트는 KRAFTON Intra Platform Team 백엔드 개발자 채용 과제로 작성되었습니다.
