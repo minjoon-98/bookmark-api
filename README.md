@@ -28,32 +28,75 @@
 ## 프로젝트 구조
 
 ```
-src/main/java/io/github/minjoon98/bookmark/
-├── config/              # 설정 클래스
-│   └── OpenApiConfig.java
-├── controller/          # REST API 컨트롤러
-│   └── BookmarkController.java
-├── domain/              # 엔티티 클래스
-│   ├── Bookmark.java
-│   └── Tag.java
-├── dto/                 # DTO 클래스
-│   ├── request/
-│   │   ├── BookmarkCreateRequest.java
-│   │   ├── BookmarkUpdateRequest.java
-│   │   └── TagUpsertRequest.java
-│   └── response/
-│       ├── BookmarkResponse.java
-│       ├── ErrorResponse.java
-│       └── MessageResponse.java
-├── exception/           # 예외 처리
-│   ├── BookmarkNotFoundException.java
-│   └── GlobalExceptionHandler.java
-├── repository/          # JPA Repository
-│   ├── BookmarkRepository.java
-│   └── TagRepository.java
-└── service/             # 비즈니스 로직
-    ├── BookmarkService.java         # 서비스 인터페이스
-    └── BookmarkServiceImpl.java     # 서비스 구현체
+bookmark-api/
+├── .github/
+│   └── workflows/
+│       └── ci.yml                        # GitHub Actions CI 설정
+├── src/main/java/io/github/minjoon98/bookmark/
+│   ├── config/                           # 애플리케이션 설정 관련
+│   │   ├── CacheConfig.java              # Caffeine 캐시 설정
+│   │   ├── CacheKeyConfig.java           # 캐시 키 전략 (Pageable, 검색어 등)
+│   │   ├── OpenApiConfig.java            # Swagger / OpenAPI 설정
+│   │   ├── SecurityConfig.java           # Spring Security + JWT 설정
+│   ├── controller/                       # REST API 컨트롤러 계층
+│   │   ├── AuthController.java           # 회원가입 / 로그인 / 로그아웃 API
+│   │   └── BookmarkController.java       # 북마크 CRUD 및 태그 기능 API
+│   ├── docs/                             # API 문서용 클래스
+│   │   ├── AuthApiDoc.java               # 인증 API 문서
+│   │   └── BookmarkApiDoc.java           # 북마크 API 문서
+│   ├── dto/                              # 계층 간 데이터 전달 객체 (DTO)
+│   │   ├── request/                      # 클라이언트 요청 DTO
+│   │   │   ├── SignUpRequest.java        # 회원가입 요청
+│   │   │   ├── LoginRequest.java         # 로그인 요청
+│   │   │   ├── BookmarkCreateRequest.java# 북마크 생성 요청
+│   │   │   ├── BookmarkUpdateRequest.java# 북마크 수정 요청
+│   │   │   └── TagUpsertRequest.java     # 태그 추가/수정 요청
+│   │   └── response/                     # 서버 응답 DTO
+│   │       ├── BookmarkResponse.java     # 북마크 응답
+│   │       ├── MessageResponse.java      # 단순 메시지 응답
+│   │       ├── ErrorResponse.java        # 에러 응답 (상태, 메시지 포함)
+│   │       └── LoginResponse.java        # 로그인 응답 (JWT 토큰 포함)
+│   ├── entity/                           # JPA 엔티티 (DB 매핑 클래스)
+│   │   ├── User.java                     # 사용자 엔티티 (이메일, 비밀번호)
+│   │   ├── Bookmark.java                 # 북마크 엔티티
+│   │   ├── Tag.java                      # 태그 엔티티
+│   │   └── BookmarkTag.java              # 북마크-태그 매핑 엔티티 (중간 테이블)
+│   ├── exception/                        # 도메인별 커스텀 예외 정의
+│   │   ├── BookmarkNotFoundException.java# 북마크 미존재 예외
+│   │   ├── DuplicateEmailException.java  # 이메일 중복 예외
+│   │   ├── InvalidCredentialsException.java # 로그인 자격 증명 오류
+│   │   ├── UserNotFoundException.java    # 사용자 미존재 예외
+│   │   ├── AuthExceptionConstant.java    # 인증 관련 예외 상수
+│   │   └── BookmarkExceptionConstant.java# 북마크 관련 예외 상수
+│   ├── global/exception/                 # 공통 예외 처리 계층
+│   │   ├── BookmarkException.java        # 공통 예외 추상 클래스
+│   │   └── GlobalExceptionHandler.java   # @RestControllerAdvice 전역 예외 처리기
+│   ├── repository/                       # 데이터 접근 계층 (JPA Repository)
+│   │   ├── UserRepository.java           # 사용자 CRUD 및 이메일 조회
+│   │   ├── BookmarkRepository.java       # 북마크 CRUD 및 사용자 기반 조회
+│   │   └── TagRepository.java            # 태그 CRUD 및 이름 기반 조회
+│   ├── service/                          # 비즈니스 로직 계층
+│   │   ├── AuthService.java              # 인증/인가 서비스
+│   │   ├── BookmarkService.java          # 북마크 서비스 인터페이스
+│   │   └── BookmarkServiceImpl.java      # 북마크 서비스 구현체
+│   └── util/                             # 공통 유틸리티
+│       ├── IssueTokenResolver.java       # JWT 토큰 발급/서명 처리
+│       ├── JwtKeyHolder.java             # JWT 비밀키 관리
+│       └── JwtDecoderProvider.java       # JWT 검증용 디코더 제공
+└── src/test/java/io/github/minjoon98/bookmark/ # 테스트 코드
+    ├── controller/                       # Controller 단위 테스트
+    │   ├── AuthControllerTest.java
+    │   └── BookmarkControllerTest.java
+    ├── repository/                       # Repository 단위 테스트
+    │   ├── UserRepositoryTest.java
+    │   ├── TagRepositoryTest.java
+    │   └── BookmarkRepositoryTest.java
+    ├── service/                          # Service 단위 테스트
+    │   ├── AuthServiceTest.java
+    │   ├── BookmarkServiceTest.java
+    │   ├── BookmarkServiceCacheTest.java
+    │   └── BookmarkServiceTagTest.java
+    └── BookmarkApplicationTests.java     # 전체 애플리케이션 통합 테스트
 ```
 
 ### 패키지 구성 설명
@@ -115,17 +158,19 @@ java -jar build/libs/bookmark-0.0.1-SNAPSHOT.jar
 
 ### 주요 엔드포인트
 
-| 기능         | 메서드    | 엔드포인트                            | 설명                            |
-| ---------- | ------ | -------------------------------- | ----------------------------- |
-| 북마크 등록     | POST   | `/bookmarks`                     | 새로운 북마크 추가                    |
-| 북마크 목록 조회  | GET    | `/bookmarks`                     | 전체 조회 (검색 `search`, 페이지네이션, 정렬 지원) |
-| 북마크 상세 조회  | GET    | `/bookmarks/{id}`                | 특정 북마크 상세                     |
-| 북마크 수정     | PUT    | `/bookmarks/{id}`                | 북마크 정보 수정                     |
-| 북마크 삭제     | DELETE | `/bookmarks/{id}`                | 북마크 삭제                        |
-| 태그별 조회 | GET    | `/bookmarks/by-tag?name={tag}`   | 해당 태그 보유 북마크 페이지 조회           |
-| 태그 추가  | POST   | `/bookmarks/{id}/tags`           | 북마크에 태그 목록 추가                 |
-| 태그 제거  | DELETE | `/bookmarks/{id}/tags/{tagName}` | 북마크에서 태그 제거                   |
-
+| 기능        | 메서드    | 엔드포인트                            | 인증 | 설명                |
+| --------- | ------ | -------------------------------- | -- | ----------------- |
+| 회원가입      | POST   | `/auth/signup`                   | ❌  | 이메일, 비밀번호로 사용자 등록 |
+| 로그인       | POST   | `/auth/login`                    | ❌  | JWT 발급            |
+| 로그아웃      | POST   | `/auth/logout`                   | ✅  | 클라이언트 토큰 폐기       |
+| 북마크 등록    | POST   | `/bookmarks`                     | ✅  | 새 북마크 생성          |
+| 북마크 목록 조회 | GET    | `/bookmarks`                     | ✅  | 전체/검색/페이지 조회      |
+| 북마크 상세 조회 | GET    | `/bookmarks/{id}`                | ✅  | 단일 북마크 조회         |
+| 북마크 수정    | PUT    | `/bookmarks/{id}`                | ✅  | 타이틀, URL, 메모 수정   |
+| 북마크 삭제    | DELETE | `/bookmarks/{id}`                | ✅  | 북마크 삭제            |
+| 태그 추가     | POST   | `/bookmarks/{id}/tags`           | ✅  | 태그 등록             |
+| 태그 제거     | DELETE | `/bookmarks/{id}/tags/{tagName}` | ✅  | 태그 삭제             |
+| 태그별 조회    | GET    | `/bookmarks/by-tag?name={tag}`   | ✅  | 태그 기반 조회          |
 
 ---
 
@@ -159,16 +204,11 @@ build/reports/tests/test/index.html
 - 의존성 최소화로 누구나 쉽게 실행 가능
 - 애플리케이션 재시작 시 자동으로 초기화되어 테스트에 용이
 
-### 2. DTO 패턴 사용
-**이유**:
-- Entity와 API 응답의 분리를 통한 계층 간 결합도 감소
-- API 스펙 변경 시 도메인 모델에 영향 최소화
-- 민감한 정보 노출 방지 및 필요한 데이터만 전송
+### 2. Stateless 인증 (JWT)
 
-**구조**:
-- `BookmarkCreateRequest`: 생성 시 필수 값 검증
-- `BookmarkUpdateRequest`: 수정 시 선택적 필드 업데이트
-- `BookmarkResponse`: 클라이언트에게 전달할 데이터만 포함
+- 세션 대신 JWT를 통해 사용자 인증 상태 유지
+- 서버 확장성 향상 및 RESTful 아키텍처 준수
+- 토큰 서명 및 검증: JwtKeyHolder + IssueTokenResolver
 
 ### 3. 인터페이스 기반 서비스 설계 (DIP)
 **이유**:
@@ -193,15 +233,10 @@ build/reports/tests/test/index.html
 - 에러: `ErrorResponse` (메시지, 상태, 타임스탬프, 상세 오류)
 
 ### 5. @RestControllerAdvice를 통한 전역 예외 처리
-**이유**:
-- 모든 컨트롤러에서 일관된 에러 응답 형식 제공
-- 중복 코드 제거 및 유지보수성 향상
-- HTTP 상태 코드와 에러 메시지의 표준화
 
-**처리 예외**:
-- `BookmarkNotFoundException`: 404 응답
-- `MethodArgumentNotValidException`: 400 응답 (필드별 검증 오류)
-- `Exception`: 500 응답 (예상치 못한 서버 오류)
+- @RestControllerAdvice + ErrorResponse 표준화
+- 검증 실패(400), 인증 오류(401), 권한 오류(403), 자원 없음(404)
+- 예외 상수 분리(AuthExceptionConstant, BookmarkExceptionConstant)
 
 ### 6. 캐싱 전략 (Caffeine 기반)
 
@@ -218,7 +253,24 @@ build/reports/tests/test/index.html
 > 📘 자세한 TTL, 캐시 정책, 키 설계 등은 [cache-design.md](cache-design.md) 참고해주세요.
 
 
-## 개선할 점
+## AI 활용 내역
+
+본 프로젝트는 AI를 효율적 학습·문서화 도구로 활용하였습니다.
+핵심 로직, 인증 구조, 캐싱, 예외 처리는 직접 설계 및 구현했습니다.
+
+| 목적             | 도구              | 활용 내용                                      |
+| -------------- | --------------- | ------------------------------------------ |
+| 개념 이해 및 오류 디버깅 | ChatGPT (GPT-5) | Spring Security, JWT 구조, Caffeine 캐시 설정 질의 |
+| 문서 정리 및 초안     | ChatGPT (GPT-5) | README, API 문서, 예외 설명 초안 정리                |
+| 코드 리팩토링 보조     | Claude Code     | 테스트 템플릿, DTO 변환, 주석 정리                     |
+
+**검증 방식**
+
+* 생성 코드 전량 테스트 통과 확인
+* 인증·예외·캐시·비즈니스 로직 직접 검증
+* 모든 코드 동작 원리 직접 설명 가능
+
+자세한 **AI 활용 방안은 [ai-notes.md](ai-notes.md) 참고해주세요.
 
 ## 라이선스
 본 프로젝트는 KRAFTON Intra Platform Team 백엔드 개발자 채용 과제로 작성되었습니다.
