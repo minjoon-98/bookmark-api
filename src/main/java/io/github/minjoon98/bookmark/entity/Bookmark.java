@@ -48,11 +48,16 @@ public class Bookmark {
     )
     private Set<Tag> tags = new LinkedHashSet<>();
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
     @Builder
-    public Bookmark(String title, String url, String memo) {
+    public Bookmark(String title, String url, String memo, User user) {
         this.title = title;
         this.url = url;
         this.memo = memo;
+        this.user = user;
     }
 
     public void update(String title, String url, String memo) {
