@@ -24,8 +24,10 @@
 - **Test Framework**: JUnit 5, Mockito, MockMvc
 - **API Documentation**: Swagger/OpenAPI (SpringDoc)
 - **Cache**: Caffeine (Local In-Memory)
+- **Security**: Spring Security + JWT (JJWT 0.12.3)
 - **Libraries**:
   - Spring Data JPA
+  - Spring Security OAuth2 Resource Server
   - Lombok
   - Jakarta Validation
 
@@ -45,7 +47,7 @@
 - [x] 전역 예외 처리 (@ControllerAdvice)
 - [x] 캐싱 (Caffeine Cache)
 - [x] **CI (GitHub Actions)** - JUnit 테스트 자동 실행 및 빌드 검증
-- [ ] **인증 기능 (Auth-Lite)** - 🚧 현재 구현 중
+- [x] **인증 기능 (Auth-Lite)** - JWT 기반 인증/인가 구현 완료
 
 ## 프로젝트 구조
 
@@ -60,37 +62,81 @@ bookmark-api/
 │   ├── config/                  # 설정 클래스
 │   │   ├── CacheConfig.java     # Caffeine 캐시 설정
 │   │   ├── CacheKeyConfig.java  # 캐시 키 생성 로직
-│   │   └── OpenApiConfig.java   # Swagger/OpenAPI 설정
+│   │   ├── OpenApiConfig.java   # Swagger/OpenAPI 설정
+│   │   ├── SecurityConfig.java  # Spring Security + JWT 설정
+│   │   ├── JwtKeyHolder.java    # JWT 비밀키 관리
+│   │   └── JwtDecoderProvider.java  # JWT 디코더 제공
 │   ├── controller/              # REST API 컨트롤러
+│   │   ├── AuthController.java  # 인증 API (회원가입/로그인/로그아웃)
 │   │   └── BookmarkController.java
 │   ├── dto/                     # 데이터 전송 객체
 │   │   ├── request/
 │   │   │   ├── BookmarkCreateRequest.java
 │   │   │   ├── BookmarkUpdateRequest.java
-│   │   │   └── TagUpsertRequest.java
+│   │   │   ├── TagUpsertRequest.java
+│   │   │   ├── SignUpRequest.java   # 회원가입 요청
+│   │   │   └── LoginRequest.java    # 로그인 요청
 │   │   └── response/
 │   │       ├── BookmarkResponse.java
 │   │       ├── ErrorResponse.java
-│   │       └── MessageResponse.java
+│   │       ├── MessageResponse.java
+│   │       └── LoginResponse.java   # 로그인 응답 (JWT 토큰 포함)
 │   ├── entity/                  # JPA 엔티티
 │   │   ├── Bookmark.java        # 북마크 엔티티
-│   │   └── Tag.java             # 태그 엔티티 (Many-to-Many)
+│   │   ├── BookmarkTag.java     # 북마크-태그 중간 테이블 엔티티
+│   │   ├── Tag.java             # 태그 엔티티
+│   │   └── User.java            # 사용자 엔티티
 │   ├── exception/               # 예외 클래스
 │   │   ├── BookmarkNotFoundException.java
+│   │   ├── DuplicateEmailException.java
+│   │   ├── InvalidCredentialsException.java
+│   │   ├── UserNotFoundException.java
 │   │   └── GlobalExceptionHandler.java  # @RestControllerAdvice
 │   ├── repository/              # JPA Repository
 │   │   ├── BookmarkRepository.java
-│   │   └── TagRepository.java
-│   └── service/                 # 비즈니스 로직
-│       ├── BookmarkService.java         # 서비스 인터페이스
-│       └── BookmarkServiceImpl.java     # 서비스 구현체
+│   │   ├── TagRepository.java
+│   │   └── UserRepository.java
+│   ├── service/                 # 비즈니스 로직
+│   │   ├── AuthService.java         # 인증 서비스
+│   │   ├── BookmarkService.java     # 서비스 인터페이스
+│   │   └── BookmarkServiceImpl.java # 서비스 구현체
+│   └── util/                    # 유틸리티
+│       └── IssueTokenResolver.java  # JWT 토큰 발급
 ├── build.gradle                 # Gradle 빌드 설정
 └── README.md                    # 프로젝트 문서
 ```
 
 ## 핵심 엔티티 설명
 
-### 1. Bookmark (북마크)
+### 1. User (사용자)
+```java
+@Entity
+@Table(name = "users")
+public class User {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true, length = 100)
+    private String email;
+
+    @Column(nullable = false, length = 255)
+    private String password;  // BCrypt 암호화
+
+    @CreationTimestamp
+    private LocalDateTime createdAt;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Bookmark> bookmarks = new ArrayList<>();
+}
+```
+
+**특징:**
+- 이메일 유니크 제약으로 중복 방지
+- 비밀번호는 BCrypt로 암호화하여 저장
+- 북마크와 One-to-Many 관계 (한 사용자가 여러 북마크 소유)
+- orphanRemoval로 사용자 삭제 시 북마크도 함께 삭제
+
+### 2. Bookmark (북마크)
 ```java
 @Entity
 @Table(name = "bookmarks")
@@ -107,25 +153,29 @@ public class Bookmark {
     @Column(length = 1000)
     private String memo;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
-    @ManyToMany
-    @JoinTable(name = "bookmark_tags", ...)
-    private Set<Tag> tags = new LinkedHashSet<>();
+    @OneToMany(mappedBy = "bookmark", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<BookmarkTag> bookmarkTags = new ArrayList<>();
 }
 ```
 
 **특징:**
+- User와 ManyToOne 관계 (각 북마크는 한 사용자에게 속함)
+- BookmarkTag 중간 테이블을 통해 Tag와 연결
 - Hibernate의 `@CreationTimestamp`, `@UpdateTimestamp` 사용
-- Tags와 Many-to-Many 양방향 관계
 - Builder 패턴 사용
 - 업데이트 메서드에서 null 체크 후 선택적 필드 업데이트
 
-### 2. Tag (태그)
+### 3. Tag (태그)
 ```java
 @Entity
 @Table(name = "tags", uniqueConstraints = @UniqueConstraint(columnNames = "name"))
@@ -139,15 +189,42 @@ public class Tag {
     @CreationTimestamp
     private LocalDateTime createdAt;
 
-    @ManyToMany(mappedBy = "tags")
-    private Set<Bookmark> bookmarks = new HashSet<>();
+    @OneToMany(mappedBy = "tag", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<BookmarkTag> bookmarkTags = new ArrayList<>();
 }
 ```
 
 **특징:**
 - 태그명은 소문자로 정규화 (`normalize()` 메서드)
 - 대소문자 구분 없이 유니크 제약 (name 컬럼)
+- BookmarkTag 중간 테이블을 통해 Bookmark와 연결
 - 어떤 북마크에서도 사용되지 않으면 자동 삭제 로직 존재
+
+### 4. BookmarkTag (북마크-태그 중간 테이블)
+```java
+@Entity
+@Table(name = "bookmark_tags")
+public class BookmarkTag {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "bookmark_id", nullable = false)
+    private Bookmark bookmark;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tag_id", nullable = false)
+    private Tag tag;
+
+    @CreationTimestamp
+    private LocalDateTime createdAt;
+}
+```
+
+**특징:**
+- Many-to-Many 관계를 명시적 엔티티로 관리
+- JPA의 동작 방식을 보장하고 향후 확장 가능성 확보
+- 북마크-태그 연결 시점 추적 가능 (createdAt)
 
 ## 아키텍처 원칙
 
@@ -182,6 +259,16 @@ Entity (도메인 모델)
 - 조회 시 캐싱, 변경 시 무효화 (`@CacheEvict`)
 - 자세한 내용은 `cache-design.md` 참고
 
+### 6. 인증/인가 (Authentication & Authorization)
+- **JWT 기반 Stateless 인증**: Spring Security + OAuth2 Resource Server
+- **비밀번호 암호화**: BCrypt (DelegatingPasswordEncoder)
+- **토큰 발급/검증**: JJWT 라이브러리 사용
+- **인가 전략**: SecurityContext에서 인증된 사용자 정보 추출 후 소유권 검증
+- **특징**:
+  - `/auth/signup`, `/auth/login` 엔드포인트는 인증 불필요 (permitAll)
+  - 모든 북마크 API는 인증 필수
+  - 각 사용자는 본인의 북마크만 접근 가능 (소유권 검증)
+
 ## 코딩 컨벤션
 
 ### 네이밍
@@ -209,18 +296,20 @@ Entity (도메인 모델)
 ### 1. Repository Layer
 - `@DataJpaTest` 사용
 - JPA 쿼리 메서드 정상 동작 확인
-- 예: `BookmarkRepositoryTest`, `TagRepositoryTest`
+- 예: `BookmarkRepositoryTest`, `TagRepositoryTest`, `UserRepositoryTest`
 
 ### 2. Service Layer
 - `@ExtendWith(MockitoExtension.class)` 사용
 - Repository를 Mock으로 대체
 - 비즈니스 로직 및 예외 처리 검증
-- 예: `BookmarkServiceTest`, `BookmarkServiceTagTest`, `BookmarkServiceCacheTest`
+- SecurityContext 모킹으로 인증 사용자 시뮬레이션
+- 예: `BookmarkServiceTest`, `BookmarkServiceTagTest`, `BookmarkServiceCacheTest`, `AuthServiceTest`
 
 ### 3. Controller Layer
 - `@WebMvcTest` + `MockMvc` 사용
 - HTTP 요청/응답 및 Validation 검증
-- 예: `BookmarkControllerTest`
+- `@AutoConfigureMockMvc(addFilters = false)`로 Security 필터 비활성화
+- 예: `BookmarkControllerTest`, `AuthControllerTest`
 
 ### 테스트 실행
 ```bash
@@ -250,17 +339,26 @@ Entity (도메인 모델)
 
 ## API 엔드포인트
 
+### 인증 API
+| 메서드 | 엔드포인트 | 설명 | 인증 필요 |
+|--------|-----------|------|---------|
+| POST | `/auth/signup` | 회원가입 | ❌ |
+| POST | `/auth/login` | 로그인 (JWT 토큰 발급) | ❌ |
+| POST | `/auth/logout` | 로그아웃 | ✅ |
+
 ### 북마크 API
-| 메서드 | 엔드포인트 | 설명 |
-|--------|-----------|------|
-| POST | `/bookmarks` | 북마크 생성 |
-| GET | `/bookmarks` | 북마크 목록 조회 (검색, 페이지네이션, 정렬 지원) |
-| GET | `/bookmarks/{id}` | 북마크 상세 조회 |
-| PUT | `/bookmarks/{id}` | 북마크 수정 |
-| DELETE | `/bookmarks/{id}` | 북마크 삭제 |
-| GET | `/bookmarks/by-tag?name={tag}` | 태그별 북마크 조회 |
-| POST | `/bookmarks/{id}/tags` | 북마크에 태그 추가 |
-| DELETE | `/bookmarks/{id}/tags/{tagName}` | 북마크에서 태그 제거 |
+| 메서드 | 엔드포인트 | 설명 | 인증 필요 |
+|--------|-----------|------|---------|
+| POST | `/bookmarks` | 북마크 생성 | ✅ |
+| GET | `/bookmarks` | 북마크 목록 조회 (검색, 페이지네이션, 정렬 지원) | ✅ |
+| GET | `/bookmarks/{id}` | 북마크 상세 조회 | ✅ |
+| PUT | `/bookmarks/{id}` | 북마크 수정 | ✅ |
+| DELETE | `/bookmarks/{id}` | 북마크 삭제 | ✅ |
+| GET | `/bookmarks/by-tag?name={tag}` | 태그별 북마크 조회 | ✅ |
+| POST | `/bookmarks/{id}/tags` | 북마크에 태그 추가 | ✅ |
+| DELETE | `/bookmarks/{id}/tags/{tagName}` | 북마크에서 태그 제거 | ✅ |
+
+**인증 방식**: HTTP Header에 `Authorization: Bearer {JWT_TOKEN}` 형식으로 토큰 전달
 
 자세한 API 명세는 [api-spec.md](api-spec.md) 참고
 
@@ -274,42 +372,65 @@ Entity (도메인 모델)
 - **Username**: `sa`
 - **Password**: (공백)
 
-## 다음 구현 사항: 인증 기능 (Auth-Lite)
+## 인증 기능 구현 상세 (Auth-Lite)
 
-### 요구사항 (과제 선택 사항)
-- 회원가입 / 로그인 / 로그아웃 기능 추가
-- 본인 계정의 북마크만 조회/수정/삭제 가능
-- 토큰 또는 세션 기반 인증 (자유 선택)
-- Refresh 토큰, 이메일 인증 등은 불필요
+### 구현 완료 사항
+- ✅ 회원가입 / 로그인 / 로그아웃 기능
+- ✅ JWT 기반 Stateless 인증
+- ✅ 사용자별 북마크 격리 (본인 북마크만 접근 가능)
+- ✅ 소유권 검증 로직
+- ✅ 모든 기능에 대한 단위/통합 테스트
 
-### 구현 계획
-1. **User 엔티티 생성**
-   - 필드: id, email, password (암호화), createdAt
-   - Bookmark와 One-to-Many 관계 설정
+### 주요 구현 내용
 
-2. **JWT 기반 인증**
-   - Spring Security 사용
-   - 로그인 시 JWT 토큰 발급
-   - API 요청 시 토큰 검증
+#### 1. User 엔티티 및 데이터 모델
+- `User` 엔티티: email (unique), password (BCrypt 암호화), createdAt
+- `Bookmark`와 One-to-Many 관계 (user_id 외래키)
+- `UserRepository`: 이메일 기반 조회, 중복 체크
 
-3. **AuthController 생성**
-   - `POST /auth/signup`: 회원가입
-   - `POST /auth/login`: 로그인 (토큰 발급)
-   - `POST /auth/logout`: 로그아웃 (토큰 무효화)
+#### 2. JWT 인증 아키텍처
+- **JwtKeyHolder**: JWT 서명/검증용 비밀키 관리
+- **JwtDecoderProvider**: Spring Security용 JWT 디코더 제공
+- **IssueTokenResolver**: 로그인 성공 시 JWT 토큰 발급
+- **SecurityConfig**:
+  - OAuth2 Resource Server 설정
+  - `/auth/signup`, `/auth/login`은 permitAll
+  - 나머지 모든 엔드포인트는 authenticated
 
-4. **BookmarkController 수정**
-   - 인증된 사용자만 접근 가능
-   - 본인의 북마크만 CRUD 가능
+#### 3. AuthService & AuthController
+- **회원가입**: 이메일 중복 검증 → 비밀번호 암호화 → 사용자 생성
+- **로그인**: 이메일/비밀번호 검증 → JWT 토큰 발급
+- **로그아웃**: Stateless이므로 클라이언트에서 토큰 삭제 안내
 
-5. **예외 처리 추가**
-   - `UserNotFoundException`
-   - `DuplicateEmailException`
-   - `InvalidCredentialsException`
-   - `UnauthorizedException`
+#### 4. 소유권 검증 (Authorization)
+- `BookmarkServiceImpl`에서 모든 작업 전 소유권 검증
+- `getCurrentUser()`: SecurityContext에서 인증된 사용자 ID 추출
+- `validateBookmarkOwner()`: 북마크 소유자와 현재 사용자 ID 비교
+- `AccessDeniedException` 발생 시 403 Forbidden 반환
 
-6. **테스트 작성**
-   - AuthService 단위 테스트
-   - 인증/인가 통합 테스트
+#### 5. 예외 처리
+- `DuplicateEmailException`: 회원가입 시 이메일 중복 (409 Conflict)
+- `InvalidCredentialsException`: 로그인 실패 (401 Unauthorized)
+- `UserNotFoundException`: 사용자를 찾을 수 없음 (404 Not Found)
+- `GlobalExceptionHandler`에서 일관된 에러 응답 처리
+
+#### 6. 테스트 커버리지
+- **UserRepositoryTest**: User 엔티티 CRUD 및 이메일 유니크 제약 검증 (11 tests)
+- **AuthServiceTest**: 회원가입/로그인 성공/실패 케이스 (8 tests)
+- **AuthControllerTest**: HTTP 요청/응답 및 Validation 검증 (8 tests)
+- **BookmarkRepositoryTest**: Bookmark 엔티티 및 User 관계 검증
+- **TagRepositoryTest**: Tag 엔티티 및 정규화 검증
+- **BookmarkServiceTest**: SecurityContext 모킹하여 인증 사용자 시뮬레이션
+- **BookmarkServiceCacheTest**: 사용자별 캐시 격리 검증
+- **BookmarkServiceTagTest**: 태그 기능에서 사용자 격리 검증
+- **BookmarkControllerTest**: 북마크 API 인증 요구사항 검증
+- **Total: 77 tests** - All passing ✅
+
+### 보안 고려사항
+- 비밀번호는 평문 저장 금지 (BCrypt 암호화)
+- JWT 비밀키는 설정 파일에서 관리 (프로덕션에서는 환경변수 권장)
+- CSRF는 Stateless API이므로 비활성화
+- 각 사용자는 자신의 리소스만 접근 가능 (소유권 검증)
 
 ## 실행 방법
 
@@ -343,6 +464,8 @@ java -jar build/libs/bookmark-0.0.1-SNAPSHOT.jar
 4. **직관적인 REST API 응답**: 불필요한 래퍼 없이 데이터 직접 반환
 5. **@RestControllerAdvice 전역 예외 처리**: 일관된 에러 응답 형식
 6. **Caffeine 캐시**: 읽기 비중 높은 서비스 최적화
+7. **JWT 기반 인증**: Stateless 아키텍처로 확장성 확보
+8. **BookmarkTag 중간 테이블**: Many-to-Many 관계의 명시적 관리로 JPA 동작 보장
 
 ## 참고 문서
 
@@ -384,5 +507,5 @@ java -jar build/libs/bookmark-0.0.1-SNAPSHOT.jar
 
 ---
 
-**Last Updated**: 2025-01-30
-**Status**: 인증 기능 구현 중
+**Last Updated**: 2025-10-30
+**Status**: 모든 기능 구현 완료 (인증, 북마크 CRUD, 태그, 검색, 캐싱, CI/CD)
