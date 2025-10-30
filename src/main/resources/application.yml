@@ -40,3 +40,7 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha
+
+# JWT Configuration
+jwt:
+  secret: krafton-bookmark-api-jwt-secret-key-for-development-only-do-not-use-in-production # 예시용 시크릿 키
