@@ -111,8 +111,7 @@ java -jar build/libs/bookmark-0.0.1-SNAPSHOT.jar
 ### Swagger를 통한 API 문서 확인
 애플리케이션 실행 후 **http://localhost:8080/swagger-ui.html** 에서 전체 API 명세를 확인할 수 있습니다.
 
-> 📗 정적 API 명세는 [docs/api-spec.md](docs/api-spec.md) 문서를 참고하세요.
-
+> 📗 정적 API 명세는 [api-spec.md](api-spec.md) 문서를 참고해주세요.
 
 ### 주요 엔드포인트
 
@@ -216,7 +215,7 @@ build/reports/tests/test/index.html
 - Look-aside 전략으로 캐시 미스 시 DB 조회 후 캐시 적재.
 - 생성·수정·삭제 시 관련 캐시 자동 무효화.
 
-> 📘 자세한 TTL, 캐시 정책, 키 설계 등은 [docs/cache-design.md](docs/cache-design.md) 참고
+> 📘 자세한 TTL, 캐시 정책, 키 설계 등은 [cache-design.md](cache-design.md) 참고해주세요.
 
 
 ## 개선할 점

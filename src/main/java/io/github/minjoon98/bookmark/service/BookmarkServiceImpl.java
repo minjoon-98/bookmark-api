@@ -2,19 +2,25 @@ package io.github.minjoon98.bookmark.service;
 
 import io.github.minjoon98.bookmark.entity.Bookmark;
 import io.github.minjoon98.bookmark.entity.Tag;
+import io.github.minjoon98.bookmark.entity.User;
 import io.github.minjoon98.bookmark.dto.request.BookmarkCreateRequest;
 import io.github.minjoon98.bookmark.dto.request.BookmarkUpdateRequest;
 import io.github.minjoon98.bookmark.dto.request.TagUpsertRequest;
 import io.github.minjoon98.bookmark.dto.response.BookmarkResponse;
 import io.github.minjoon98.bookmark.exception.BookmarkNotFoundException;
+import io.github.minjoon98.bookmark.exception.UserNotFoundException;
 import io.github.minjoon98.bookmark.repository.BookmarkRepository;
 import io.github.minjoon98.bookmark.repository.TagRepository;
+import io.github.minjoon98.bookmark.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -26,6 +32,27 @@ public class BookmarkServiceImpl implements BookmarkService {
 
     private final BookmarkRepository bookmarkRepository;
     private final TagRepository tagRepository;
+    private final UserRepository userRepository;
+
+    /**
+     * 현재 인증된 사용자 가져오기
+     */
+    private User getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        Long userId = Long.parseLong(authentication.getName());
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+    }
+
+    /**
+     * 북마크 소유자 검증
+     */
+    private void validateBookmarkOwner(Bookmark bookmark) {
+        User currentUser = getCurrentUser();
+        if (!bookmark.getUser().getId().equals(currentUser.getId())) {
+            throw new AccessDeniedException("해당 북마크에 대한 접근 권한이 없습니다");
+        }
+    }
 
     /**
      * 북마크 생성 - 목록 캐시 전체 무효화
@@ -39,10 +66,13 @@ public class BookmarkServiceImpl implements BookmarkService {
     @Override
     @Transactional
     public BookmarkResponse createBookmark(BookmarkCreateRequest request) {
+        User currentUser = getCurrentUser();
+
         Bookmark bookmark = Bookmark.builder()
             .title(request.getTitle())
             .url(request.getUrl())
             .memo(request.getMemo())
+            .user(currentUser)
             .build();
         return BookmarkResponse.from(bookmarkRepository.save(bookmark));
     }
@@ -66,9 +96,12 @@ public class BookmarkServiceImpl implements BookmarkService {
     })
     @Override
     public Page<BookmarkResponse> getBookmarks(String q, Pageable pageable) {
+        User currentUser = getCurrentUser();
+
         Page<Bookmark> page = StringUtils.hasText(q)
-            ? bookmarkRepository.findByTitleContainingIgnoreCaseOrUrlContainingIgnoreCase(q, q, pageable)
-            : bookmarkRepository.findAll(pageable);
+            ? bookmarkRepository.findByUserAndTitleContainingIgnoreCaseOrUserAndUrlContainingIgnoreCase(
+                currentUser, q, currentUser, q, pageable)
+            : bookmarkRepository.findByUser(currentUser, pageable);
         return page.map(BookmarkResponse::from);
     }
 
@@ -87,6 +120,7 @@ public class BookmarkServiceImpl implements BookmarkService {
     public BookmarkResponse addTags(Long bookmarkId, TagUpsertRequest request) {
         Bookmark bookmark = bookmarkRepository.findById(bookmarkId)
             .orElseThrow(() -> new BookmarkNotFoundException(bookmarkId));
+        validateBookmarkOwner(bookmark);
 
         for (String raw : request.getNames()) {
             String name = Tag.normalize(raw);
@@ -115,6 +149,7 @@ public class BookmarkServiceImpl implements BookmarkService {
     public BookmarkResponse removeTag(Long bookmarkId, String tagName) {
         Bookmark bookmark = bookmarkRepository.findById(bookmarkId)
             .orElseThrow(() -> new BookmarkNotFoundException(bookmarkId));
+        validateBookmarkOwner(bookmark);
 
         String normalized = Tag.normalize(tagName);
         Tag tag = tagRepository.findByNameIgnoreCase(normalized)
@@ -123,7 +158,7 @@ public class BookmarkServiceImpl implements BookmarkService {
         bookmark.removeTag(tag);
 
         // 사용처가 더 없으면 태그 정리(선택)
-        if (tag.getBookmarks().isEmpty()) {
+        if (tag.getBookmarkTags().isEmpty()) {
             tagRepository.delete(tag);
         }
         return BookmarkResponse.from(bookmark);
@@ -140,8 +175,9 @@ public class BookmarkServiceImpl implements BookmarkService {
     )
     @Override
     public Page<BookmarkResponse> getBookmarksByTag(String tagName, Pageable pageable) {
-        Page<Bookmark> page = bookmarkRepository.findDistinctByTags_NameIgnoreCase(
-            Tag.normalize(tagName), pageable);
+        User currentUser = getCurrentUser();
+        Page<Bookmark> page = bookmarkRepository.findDistinctByUserAndTagName(
+            currentUser, Tag.normalize(tagName), pageable);
         return page.map(BookmarkResponse::from);
     }
 
@@ -154,6 +190,7 @@ public class BookmarkServiceImpl implements BookmarkService {
     public BookmarkResponse getBookmarkById(Long id) {
         Bookmark bookmark = bookmarkRepository.findById(id)
             .orElseThrow(() -> new BookmarkNotFoundException(id));
+        validateBookmarkOwner(bookmark);
         return BookmarkResponse.from(bookmark);
     }
 
@@ -172,6 +209,7 @@ public class BookmarkServiceImpl implements BookmarkService {
     public BookmarkResponse updateBookmark(Long id, BookmarkUpdateRequest request) {
         Bookmark bookmark = bookmarkRepository.findById(id)
             .orElseThrow(() -> new BookmarkNotFoundException(id));
+        validateBookmarkOwner(bookmark);
         bookmark.update(request.getTitle(), request.getUrl(), request.getMemo());
         return BookmarkResponse.from(bookmark);
     }
@@ -189,9 +227,9 @@ public class BookmarkServiceImpl implements BookmarkService {
     @Override
     @Transactional
     public void deleteBookmark(Long id) {
-        if (!bookmarkRepository.existsById(id)) {
-            throw new BookmarkNotFoundException(id);
-        }
+        Bookmark bookmark = bookmarkRepository.findById(id)
+            .orElseThrow(() -> new BookmarkNotFoundException(id));
+        validateBookmarkOwner(bookmark);
         bookmarkRepository.deleteById(id);
     }
 }

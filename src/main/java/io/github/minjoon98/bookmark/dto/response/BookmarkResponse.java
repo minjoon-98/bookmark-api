@@ -45,10 +45,13 @@ public class BookmarkResponse {
             .memo(bookmark.getMemo())
             .createdAt(bookmark.getCreatedAt())
             .updatedAt(bookmark.getUpdatedAt())
-            .tags(bookmark.getTags().stream()
-                .map(Tag::getName)
-                .sorted()
-                .toList())
+            .tags(
+                bookmark.getBookmarkTags().stream()
+                    .map(bt -> bt.getTag().getName()) // BookmarkTag -> Tag -> name
+                    .distinct()                       // 같은 태그 중복 방지
+                    .sorted()
+                    .toList()
+            )
             .build();
     }
 }

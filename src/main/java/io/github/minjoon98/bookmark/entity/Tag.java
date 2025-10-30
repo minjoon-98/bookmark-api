@@ -1,6 +1,8 @@
 package io.github.minjoon98.bookmark.entity;
 
 import jakarta.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
@@ -18,14 +20,14 @@ public class Tag {
 
     // 소문자 기준 유니크. 표시는 원문 그대로 해도 되지만, 간단히 소문자로 저장.
     @Column(nullable = false, length = 50)
-    private String name;
+    private String name; // normalize된 소문자
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @ManyToMany(mappedBy = "tags")
-    private Set<Bookmark> bookmarks = new HashSet<>();
+    @OneToMany(mappedBy = "tag", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<BookmarkTag> bookmarkTags = new ArrayList<>();
 
     @Builder
     public Tag(String name) {

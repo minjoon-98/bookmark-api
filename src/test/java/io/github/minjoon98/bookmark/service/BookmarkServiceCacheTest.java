@@ -4,8 +4,11 @@ import io.github.minjoon98.bookmark.dto.request.BookmarkCreateRequest;
 import io.github.minjoon98.bookmark.dto.request.BookmarkUpdateRequest;
 import io.github.minjoon98.bookmark.dto.request.TagUpsertRequest;
 import io.github.minjoon98.bookmark.dto.response.BookmarkResponse;
+import io.github.minjoon98.bookmark.entity.User;
 import io.github.minjoon98.bookmark.repository.BookmarkRepository;
 import io.github.minjoon98.bookmark.repository.TagRepository;
+import io.github.minjoon98.bookmark.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,8 +18,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -33,6 +38,7 @@ import static org.mockito.Mockito.*;
  */
 @SpringBootTest
 @ActiveProfiles("test")
+@Transactional
 class BookmarkServiceCacheTest {
 
     @Autowired
@@ -46,6 +52,30 @@ class BookmarkServiceCacheTest {
 
     @Autowired
     private CacheManager cacheManager;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    private User testUser;
+
+    @BeforeEach
+    void setUp() {
+        // 테스트 사용자 생성
+        testUser = userRepository.save(User.builder()
+                .email("cache-test@example.com")
+                .password("password")
+                .build());
+
+        // SecurityContext 설정 (직접 설정)
+        org.springframework.security.core.Authentication authentication =
+            new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                testUser.getId().toString(), null, List.of());
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+                .setAuthentication(authentication);
+
+        // 캐시 초기화
+        clearAllCaches();
+    }
 
     @Test
     @DisplayName("단건 조회 시 캐시가 적용되어 두 번째 조회는 DB를 호출하지 않는다")
@@ -85,7 +115,7 @@ class BookmarkServiceCacheTest {
         Page<BookmarkResponse> second = bookmarkService.getBookmarks(null, pageable);
 
         // then - Repository는 1회만 호출
-        verify(bookmarkRepository, times(1)).findAll(any(Pageable.class));
+        verify(bookmarkRepository, times(1)).findByUser(eq(testUser), any(Pageable.class));
         assertThat(first.getTotalElements()).isEqualTo(second.getTotalElements());
     }
 
@@ -107,7 +137,8 @@ class BookmarkServiceCacheTest {
 
         // then - Repository는 1회만 호출
         verify(bookmarkRepository, times(1))
-            .findByTitleContainingIgnoreCaseOrUrlContainingIgnoreCase(eq(keyword), eq(keyword), any(Pageable.class));
+            .findByUserAndTitleContainingIgnoreCaseOrUserAndUrlContainingIgnoreCase(
+                    eq(testUser), eq(keyword), eq(testUser), eq(keyword), any(Pageable.class));
         assertThat(first.getTotalElements()).isEqualTo(second.getTotalElements());
     }
 
@@ -126,7 +157,7 @@ class BookmarkServiceCacheTest {
         bookmarkService.getBookmarks(null, pageable);
 
         // then - Repository가 다시 호출됨 (캐시 미스)
-        verify(bookmarkRepository, times(1)).findAll(any(Pageable.class));
+        verify(bookmarkRepository, times(1)).findByUser(eq(testUser), any(Pageable.class));
     }
 
     @Test
@@ -152,7 +183,7 @@ class BookmarkServiceCacheTest {
 
         // then - Repository가 각각 재호출됨 (update 시 1회 + 재조회 시 1회 = 2회)
         verify(bookmarkRepository, times(2)).findById(id);
-        verify(bookmarkRepository, times(1)).findAll(any(Pageable.class));
+        verify(bookmarkRepository, times(1)).findByUser(eq(testUser), any(Pageable.class));
     }
 
     @Test
@@ -176,7 +207,8 @@ class BookmarkServiceCacheTest {
             bookmarkService.getBookmarkById(id);
         } catch (Exception e) {
             // 예외 발생 = DB 조회 시도 = 캐시 무효화 성공
-            verify(bookmarkRepository, times(1)).findById(id);
+            // deleteBookmark에서 1회, getBookmarkById에서 1회 = 총 2회
+            verify(bookmarkRepository, times(2)).findById(id);
         }
     }
 
@@ -242,7 +274,7 @@ class BookmarkServiceCacheTest {
         bookmarkService.getBookmarks(null, page1);
 
         // then - 캐싱 안 되므로 2회 호출
-        verify(bookmarkRepository, times(2)).findAll(any(Pageable.class));
+        verify(bookmarkRepository, times(2)).findByUser(eq(testUser), any(Pageable.class));
     }
 
     @Test
@@ -264,7 +296,7 @@ class BookmarkServiceCacheTest {
 
         // then - 1회만 호출
         verify(bookmarkRepository, times(1))
-            .findDistinctByTags_NameIgnoreCase(eq("framework"), any(Pageable.class));
+            .findDistinctByUserAndTagName(eq(testUser), eq("framework"), any(Pageable.class));
     }
 
     /**
